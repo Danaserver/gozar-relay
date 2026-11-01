@@ -1,0 +1,27 @@
+# Protect config.json from direct HTTP access
+<Files "config.json">
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</Files>
+
+# Enable CGI execution for Python
+Options +ExecCGI
+AddHandler cgi-script .py
+
+# LiteSpeed specific optimizations for Telegram long-polling (getUpdates)
+<IfModule Litespeed>
+    RewriteRule .* - [E=noconntimeout:1]
+    RewriteRule .* - [E=noabort:1]
+</IfModule>
+
+# URL Rewriting for Relay and Admin Panel (works on root subdomain or any subfolder)
+RewriteEngine On
+
+# Do not rewrite static files if any exist
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ relay.py [L,QSA]
