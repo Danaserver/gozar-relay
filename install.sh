@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Telegram Bot API Relay & Admin Panel - One-Command Auto Installer
-# Supports: Ubuntu, Debian, CentOS, AlmaLinux, RockyLinux, Fedora, Alpine
+# Telegram Bot API Relay & Admin Panel - Auto Installer
+# Supports: Ubuntu, Debian, CentOS, AlmaLinux, RockyLinux, Fedora, Alpine, Arch
 # Works on fresh/raw servers or alongside existing web servers (Nginx/Apache).
 # ==============================================================================
 
 set -e
 
-# Default GitHub Repo (User can override via: GITHUB_REPO="user/repo" bash install.sh)
+# Default GitHub Repo (Override via: GITHUB_REPO="user/repo" bash install.sh)
 GITHUB_REPO="${GITHUB_REPO:-"Danaserver/telegram-relay"}"
 GITHUB_BRANCH="${GITHUB_BRANCH:-"main"}"
 RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}"
@@ -32,20 +32,19 @@ NC='\033[0m'
 
 echo -e "${CYAN}${BOLD}"
 echo "================================================================"
-echo "   ⚡ Telegram Bot API Relay & Admin Panel - Auto Installer   "
-echo "        نصب خودکار رله تلگرام و پنل مدیریت روی سرور لینوکس       "
+echo "    Telegram Bot API Relay & Admin Panel - Auto Installer       "
 echo "================================================================"
 echo -e "${NC}"
 
 # 1. Check Root Privileges
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}[!] لطفا این اسکریپت را با دسترسی روت (root) اجرا کنید:${NC}"
+    echo -e "${RED}[!] Error: Please run this installer with root privileges:${NC}"
     echo "    sudo bash $0"
     exit 1
 fi
 
 # 2. Detect OS & Install Python 3 and dependencies
-echo -e "${BLUE}[*] در حال شناسایی سیستم‌عامل و نصب پیش‌نیازها (Python 3, curl, openssl)...${NC}"
+echo -e "${BLUE}[*] Detecting operating system and installing dependencies (Python 3, curl, openssl)...${NC}"
 
 if [ -f /etc/debian_version ]; then
     export DEBIAN_FRONTEND=noninteractive
@@ -63,23 +62,23 @@ elif [ -f /etc/alpine-release ]; then
 elif [ -f /etc/arch-release ]; then
     pacman -Sy --noconfirm python curl openssl
 else
-    echo -e "${YELLOW}[!] سیستم‌عامل شناسایی نشد، تلاش برای استفاده از پایتون موجود...${NC}"
+    echo -e "${YELLOW}[!] Warning: Unknown OS distribution, attempting to use existing Python...${NC}"
 fi
 
 # Verify Python 3
 if ! command -v python3 >/dev/null 2>&1; then
-    echo -e "${RED}[ERROR] نصب پایتون ۳ با خطا مواجه شد. لطفاً ابتدا پایتون را به صورت دستی نصب کنید.${NC}"
+    echo -e "${RED}[ERROR] Python 3 installation failed. Please install Python 3 manually.${NC}"
     exit 1
 fi
 
 PYTHON_BIN=$(command -v python3)
 PYTHON_VER=$($PYTHON_BIN --version 2>&1)
-echo -e "${GREEN}[✓] پایتون آماده است: ${PYTHON_VER}${NC}"
+echo -e "${GREEN}[✓] Python is ready: ${PYTHON_VER}${NC}"
 
 # 3. Setup Installation Directory & Server IP
 SERVER_IP=$(curl -s4 --max-time 3 https://api.ipify.org || curl -s4 --max-time 3 https://ifconfig.me || hostname -I | awk '{print $1}')
 INSTALL_DIR="/opt/telegram-relay"
-echo -e "${BLUE}[*] در حال آماده‌سازی دایرکتوری نصب در ${INSTALL_DIR}...${NC}"
+echo -e "${BLUE}[*] Preparing installation directory at ${INSTALL_DIR}...${NC}"
 mkdir -p "$INSTALL_DIR"
 
 # Temporarily stop existing telegram-relay service to accurately detect third-party port conflicts
@@ -118,7 +117,7 @@ PROC_80=""
 if check_port_in_use 80; then
     PORT_80_BUSY=1
     PROC_80=$(get_port_process 80)
-    [ -z "$PROC_80" ] && PROC_80="یک وب‌سرور/سرویس دیگر"
+    [ -z "$PROC_80" ] && PROC_80="existing service"
 fi
 
 PORT_443_BUSY=0
@@ -126,41 +125,40 @@ PROC_443=""
 if check_port_in_use 443; then
     PORT_443_BUSY=1
     PROC_443=$(get_port_process 443)
-    [ -z "$PROC_443" ] && PROC_443="یک سرویس دیگر"
+    [ -z "$PROC_443" ] && PROC_443="existing service"
 fi
 
 # Interactive Port Configuration (if not passed via ENV or CLI arguments)
 if [ -z "$PORT" ] || [ -z "$SSL_PORT" ]; then
     if [ -e /dev/tty ]; then
         echo -e "\n${YELLOW}----------------------------------------------------------------${NC}"
-        echo -e "${BOLD}⚙️  تنظیم پورت‌های اختصاصی (HTTP و HTTPS):${NC}"
-        echo -e "اگر سرور شما از قبل وب‌سرور دیگری (مانند Nginx، Apache یا پنل‌های دیگر) دارد،"
-        echo -e "می‌توانید رله را روی پورت‌های دلخواه تنظیم کنید تا در کنار آن کار کند."
-        echo -e "💡 نکته: وارد کردن ${BOLD}0${NC} هر پورت را کاملاً غیرفعال می‌کند."
+        echo -e "${BOLD}[ Port Configuration ]${NC}"
+        echo -e "You can assign custom ports if another web server (Nginx/Apache/etc.) is running."
+        echo -e "Tip: Entering 0 disables that protocol completely."
         echo -e "${YELLOW}----------------------------------------------------------------${NC}"
 
         # HTTP Port Prompt
         if [ -z "$PORT" ]; then
             if [ "$PORT_80_BUSY" -eq 1 ]; then
-                echo -e "${RED}[!] توجه: پورت 80 توسط سرویس (${PROC_80}) در حال استفاده است!${NC}"
+                echo -e "${RED}[!] Notice: Port 80 is currently in use by (${PROC_80}).${NC}"
                 DEFAULT_HTTP=8080
             else
                 DEFAULT_HTTP=80
             fi
-            read -r -p "پورت HTTP [پیش‌فرض: ${DEFAULT_HTTP}]: " INPUT_PORT </dev/tty || true
+            read -r -p "HTTP Port [Default: ${DEFAULT_HTTP}]: " INPUT_PORT </dev/tty || true
             PORT="${INPUT_PORT:-$DEFAULT_HTTP}"
         fi
 
         # SSL Port Prompt
         if [ -z "$SSL_PORT" ]; then
             if [ "$PORT_443_BUSY" -eq 1 ]; then
-                echo -e "${RED}[!] توجه: پورت 443 توسط سرویس (${PROC_443}) در حال استفاده است!${NC}"
+                echo -e "${RED}[!] Notice: Port 443 is currently in use by (${PROC_443}).${NC}"
                 DEFAULT_SSL=8443
             else
                 DEFAULT_SSL=443
             fi
-            echo -e "💡 پورت‌های SSL سازگار با Cloudflare: ${CYAN}443, 8443, 2053, 2083, 2087, 2096${NC}"
-            read -r -p "پورت HTTPS / SSL [پیش‌فرض: ${DEFAULT_SSL}]: " INPUT_SSL_PORT </dev/tty || true
+            echo -e "Cloudflare HTTPS supported ports: ${CYAN}443, 8443, 2053, 2083, 2087, 2096${NC}"
+            read -r -p "HTTPS / SSL Port [Default: ${DEFAULT_SSL}]: " INPUT_SSL_PORT </dev/tty || true
             SSL_PORT="${INPUT_SSL_PORT:-$DEFAULT_SSL}"
         fi
         echo -e "${YELLOW}----------------------------------------------------------------${NC}\n"
@@ -180,22 +178,22 @@ PORT=$((PORT + 0))
 SSL_PORT=$((SSL_PORT + 0))
 
 if [ "$PORT" -le 0 ] && [ "$SSL_PORT" -le 0 ]; then
-    echo -e "${RED}[ERROR] حداقل یکی از پورت‌های HTTP یا HTTPS باید فعال (بزرگتر از 0) باشد.${NC}"
+    echo -e "${RED}[ERROR] At least one port (HTTP or HTTPS) must be enabled (greater than 0).${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}[✓] پورت HTTP:${NC}  $([ "$PORT" -gt 0 ] && echo "$PORT" || echo "غیرفعال (0)")"
-echo -e "${GREEN}[✓] پورت HTTPS:${NC} $([ "$SSL_PORT" -gt 0 ] && echo "$SSL_PORT" || echo "غیرفعال (0)")"
+echo -e "${GREEN}[✓] HTTP Port:${NC}  $([ "$PORT" -gt 0 ] && echo "$PORT" || echo "Disabled (0)")"
+echo -e "${GREEN}[✓] HTTPS Port:${NC} $([ "$SSL_PORT" -gt 0 ] && echo "$SSL_PORT" || echo "Disabled (0)")"
 
 # 5. Domain / Subdomain Setup (Interactive Prompt)
 if [ -z "$DOMAIN" ]; then
     if [ -e /dev/tty ]; then
         echo -e "\n${YELLOW}----------------------------------------------------------------${NC}"
-        echo -e "${BOLD}🌐 تنظیم دامنه یا سابدامنه (اختیاری):${NC}"
-        echo -e "اگر سابدامنه یا دامنه‌ای دارید (مانند ${CYAN}relay.yourdomain.com${NC}) که رکورد A آن را به"
-        echo -e "آی‌پی این سرور (${GREEN}${SERVER_IP}${NC}) متصل کرده‌اید، آن را وارد کنید."
-        echo -e "در غیر این صورت، کلید ${BOLD}Enter${NC} را بزنید تا بر روی همین آی‌پی تنظیم شود."
-        read -r -p "دامنه یا سابدامنه (خالی = فقط آی‌پی): " INPUT_DOMAIN </dev/tty || true
+        echo -e "${BOLD}[ Domain / Subdomain Setup (Optional) ]${NC}"
+        echo -e "If you pointed a domain or subdomain (e.g. ${CYAN}relay.yourdomain.com${NC}) to"
+        echo -e "this server's IP (${GREEN}${SERVER_IP}${NC}), enter it below."
+        echo -e "Otherwise, press ${BOLD}Enter${NC} to use the server IP address directly."
+        read -r -p "Domain or Subdomain (Leave blank for IP): " INPUT_DOMAIN </dev/tty || true
         DOMAIN=$(echo "$INPUT_DOMAIN" | tr -d ' ' | sed -e 's/^https\?:\/\///' -e 's/\/.*$//')
         echo -e "${YELLOW}----------------------------------------------------------------${NC}\n"
     fi
@@ -204,12 +202,12 @@ fi
 SSL_CN="telegram-relay"
 if [ -n "$DOMAIN" ]; then
     SSL_CN="$DOMAIN"
-    echo -e "${GREEN}[✓] دامنه انتخاب شده: ${DOMAIN}${NC}"
+    echo -e "${GREEN}[✓] Domain selected: ${DOMAIN}${NC}"
 else
-    echo -e "${BLUE}[*] از آی‌پی سرور (${SERVER_IP}) استفاده می‌شود.${NC}"
+    echo -e "${BLUE}[*] Using server IP address: ${SERVER_IP}${NC}"
 fi
 
-# 6. Obtain relay.py (Local > GitHub Raw > Mirror)
+# 6. Obtain relay.py (Local > GitHub Raw)
 CURRENT_SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "")"
 TARGET_RELAY="$INSTALL_DIR/relay.py"
 
@@ -218,24 +216,29 @@ if [ -f "./relay.py" ] && [ "$(pwd)/relay.py" != "$TARGET_RELAY" ]; then
 elif [ -n "$CURRENT_SCRIPT_DIR" ] && [ -f "$CURRENT_SCRIPT_DIR/relay.py" ] && [ "$CURRENT_SCRIPT_DIR/relay.py" != "$TARGET_RELAY" ]; then
     cp -f "$CURRENT_SCRIPT_DIR/relay.py" "$TARGET_RELAY"
 elif [ ! -f "$TARGET_RELAY" ]; then
-    echo -e "${BLUE}[*] در حال دریافت آخرین نسخه relay.py...${NC}"
-    curl -sSL "${RAW_BASE}/relay.py" -o "$TARGET_RELAY" || \
-    curl -sSL "https://robot.telo.ir/Relay/relay.py" -o "$TARGET_RELAY" || {
-        echo -e "${RED}[ERROR] دریافت فایل relay.py ناموفق بود.${NC}"
+    echo -e "${BLUE}[*] Downloading latest relay.py...${NC}"
+    curl -sSL "${RAW_BASE}/relay.py" -o "$TARGET_RELAY" || {
+        echo -e "${RED}[ERROR] Failed to download relay.py.${NC}"
         exit 1
     }
 fi
 
 chmod +x "$TARGET_RELAY"
 
-# 7. Initialize Config if not exists
+# 7. Initialize Config with Random Password & Keys if not exists
 CONFIG_FILE="$INSTALL_DIR/config.json"
 ADMIN_USER="admin"
-ADMIN_PASS=${ADMIN_PASS:-"Admin@Telo2026"}
-DEFAULT_BOT_KEY="telo_sec_$(openssl rand -hex 3)"
+
+# Generate random secure admin password if not explicitly supplied
+if [ -z "$ADMIN_PASS" ]; then
+    ADMIN_PASS=$($PYTHON_BIN -c "import secrets; print(secrets.token_urlsafe(12))")
+fi
+
+# Generate random bot key (e.g. key_a1b2c3d4e5f6)
+DEFAULT_BOT_KEY="key_$($PYTHON_BIN -c "import secrets; print(secrets.token_hex(6))")"
 
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo -e "${BLUE}[*] در حال تولید رمز عبور و پیکربندی اولیه...${NC}"
+    echo -e "${BLUE}[*] Generating initial configuration and credentials...${NC}"
     $PYTHON_BIN -c "
 import hashlib, secrets, json, time
 
@@ -266,14 +269,14 @@ with open('${CONFIG_FILE}', 'w', encoding='utf-8') as f:
     json.dump(cfg, f, ensure_ascii=False, indent=2)
 "
     chmod 600 "$CONFIG_FILE"
-    echo -e "${GREEN}[✓] تنظیمات با موفقیت ذخیره شد.${NC}"
+    echo -e "${GREEN}[✓] Configuration generated successfully.${NC}"
 else
-    echo -e "${YELLOW}[i] فایل تنظیمات موجود حفظ شد: ${CONFIG_FILE}${NC}"
+    echo -e "${YELLOW}[i] Preserving existing configuration file: ${CONFIG_FILE}${NC}"
 fi
 
 # 8. Configure Systemd Service
 SERVICE_FILE="/etc/systemd/system/telegram-relay.service"
-echo -e "${BLUE}[*] در حال پیکربندی سرویس خودکار systemd...${NC}"
+echo -e "${BLUE}[*] Configuring systemd service...${NC}"
 
 cat <<EOF > "$SERVICE_FILE"
 [Unit]
@@ -296,7 +299,7 @@ EOF
 # 9. SSL Certificate & Firewall Configuration
 if [ "$SSL_PORT" -gt 0 ]; then
     if [ ! -f "$INSTALL_DIR/server.crt" ]; then
-        echo -e "${BLUE}[*] در حال تولید گواهی امنیتی SSL برای ${SSL_CN} روی پورت ${SSL_PORT}...${NC}"
+        echo -e "${BLUE}[*] Generating self-signed SSL certificate for ${SSL_CN} on port ${SSL_PORT}...${NC}"
         openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
           -keyout "$INSTALL_DIR/server.key" \
           -out "$INSTALL_DIR/server.crt" \
@@ -312,10 +315,10 @@ ALLOW_PORTS=()
 
 for p in "${ALLOW_PORTS[@]}"; do
     if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-        echo -e "${BLUE}[*] باز کردن پورت ${p} در فایروال UFW...${NC}"
+        echo -e "${BLUE}[*] Allowing port ${p} in UFW firewall...${NC}"
         ufw allow "${p}/tcp" >/dev/null 2>&1 || true
     elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-        echo -e "${BLUE}[*] باز کردن پورت ${p} در فایروال firewalld...${NC}"
+        echo -e "${BLUE}[*] Allowing port ${p} in firewalld...${NC}"
         firewall-cmd --add-port="${p}/tcp" --permanent >/dev/null 2>&1 || true
     fi
 done
@@ -332,9 +335,9 @@ sleep 1
 
 # Check if running
 if systemctl is-active --quiet telegram-relay; then
-    echo -e "${GREEN}[✓] سرویس با موفقیت فعال و اجرا شد!${NC}"
+    echo -e "${GREEN}[✓] Service successfully started and active!${NC}"
 else
-    echo -e "${RED}[ERROR] سرویس اجرا نشد. بررسی لاگ:${NC}"
+    echo -e "${RED}[ERROR] Service failed to start. Journal log:${NC}"
     journalctl -u telegram-relay -n 20 --no-pager
     exit 1
 fi
@@ -366,53 +369,70 @@ fi
 IP_HTTP=$(format_url "http" "$SERVER_IP" "$PORT")
 IP_HTTPS=$(format_url "https" "$SERVER_IP" "$SSL_PORT")
 
-# 12. Final Summary
+# 12. Final Clean Summary (Each detail on its own line for easy double-click copying)
 echo -e "\n${GREEN}${BOLD}================================================================${NC}"
-echo -e "${GREEN}${BOLD}      🎉 رله تلگرام با موفقیت روی سرور نصب و فعال شد!          ${NC}"
+echo -e "${GREEN}${BOLD}   Telegram Bot API Relay & Admin Panel - Installed Successfully!${NC}"
 echo -e "${GREEN}${BOLD}================================================================${NC}"
 echo -e ""
-echo -e "  🌐 ${BOLD}آدرس اصلی پنل مدیریت:${NC}  ${CYAN}${PRIMARY_URL}/${NC}"
+echo -e "${BOLD}[ Web Panel URL ]${NC}"
+echo -e "${CYAN}${PRIMARY_URL}/${NC}"
+echo -e ""
+
 if [ -n "$DOMAIN" ]; then
     if [ -n "$IP_HTTPS" ]; then
-        echo -e "  🔒 ${BOLD}آدرس مستقیم با آی‌پی (SSL):${NC}  ${CYAN}${IP_HTTPS}/${NC}"
+        echo -e "${BOLD}[ Direct IP Access (SSL) ]${NC}"
+        echo -e "${CYAN}${IP_HTTPS}/${NC}"
+        echo -e ""
     fi
     if [ -n "$IP_HTTP" ]; then
-        echo -e "  🔗 ${BOLD}آدرس مستقیم با آی‌پی (HTTP):${NC} ${CYAN}${IP_HTTP}/${NC}"
+        echo -e "${BOLD}[ Direct IP Access (HTTP) ]${NC}"
+        echo -e "${CYAN}${IP_HTTP}/${NC}"
+        echo -e ""
     fi
 else
     if [ -n "$IP_HTTPS" ] && [ "$SSL_PORT" -gt 0 ]; then
-        echo -e "  🔒 ${BOLD}آدرس با پروتکل SSL:${NC}         ${CYAN}${IP_HTTPS}/${NC}"
+        echo -e "${BOLD}[ Direct IP Access (SSL) ]${NC}"
+        echo -e "${CYAN}${IP_HTTPS}/${NC}"
+        echo -e ""
     fi
 fi
-echo -e "  👤 ${BOLD}نام کاربری مدیر:${NC}          ${YELLOW}${ADMIN_USER}${NC}"
-if [ -n "$ADMIN_PASS" ]; then
-echo -e "  🔑 ${BOLD}رمز عبور مدیر:${NC}            ${YELLOW}${ADMIN_PASS}${NC}"
-fi
-echo -e "  🤖 ${BOLD}کد اختصاصی ربات:${NC}          ${CYAN}${DEFAULT_BOT_KEY}${NC}"
+
+echo -e "${BOLD}[ Admin Login Credentials ]${NC}"
+echo -e "Username:"
+echo -e "${YELLOW}${ADMIN_USER}${NC}"
+echo -e "Password:"
+echo -e "${YELLOW}${ADMIN_PASS}${NC}"
 echo -e ""
-echo -e "----------------------------------------------------------------"
-echo -e "  🚀 ${BOLD}نحوه استفاده در کدهای ربات (روی سرور ایران):${NC}"
-echo -e "     API_URL = \"${PRIMARY_URL}/${DEFAULT_BOT_KEY}/bot<TOKEN>\""
-echo -e "----------------------------------------------------------------"
+
+echo -e "${BOLD}[ Default Bot Access Key ]${NC}"
+echo -e "${CYAN}${DEFAULT_BOT_KEY}${NC}"
+echo -e ""
+
+echo -e "${BOLD}[ Telegram Bot API Base URL (for scripts in Iran) ]${NC}"
+echo -e "${CYAN}${PRIMARY_URL}/${DEFAULT_BOT_KEY}/bot<TOKEN>${NC}"
+echo -e ""
+
 if [ "$PORT_80_BUSY" -eq 1 ] || [ "$PORT_443_BUSY" -eq 1 ]; then
-echo -e "  💡 ${BOLD}راهنمایی تنظیم Nginx Reverse Proxy (در صورت نیاز به پورت‌های 80/443):${NC}"
-echo -e "     اگر می‌خواهید دامنه روی پورت‌های استاندارد از طریق وب‌سرور موجود کار کند:"
-echo -e "     server {"
-echo -e "         server_name ${DOMAIN:-"relay.yourdomain.com"};"
-echo -e "         listen 80;"
-echo -e "         location / {"
-echo -e "             proxy_pass http://127.0.0.1:$([ "$PORT" -gt 0 ] && echo "$PORT" || echo "8080");"
-echo -e "             proxy_set_header Host \$host;"
-echo -e "             proxy_set_header X-Real-IP \$remote_addr;"
-echo -e "             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
-echo -e "             proxy_set_header X-Forwarded-Proto \$scheme;"
-echo -e "         }"
-echo -e "     }"
 echo -e "----------------------------------------------------------------"
+echo -e "${BOLD}[ Nginx Reverse Proxy Example (Optional) ]${NC}"
+echo -e "server {"
+echo -e "    listen 80;"
+echo -e "    server_name ${DOMAIN:-"relay.yourdomain.com"};"
+echo -e "    location / {"
+echo -e "        proxy_pass http://127.0.0.1:$([ "$PORT" -gt 0 ] && echo "$PORT" || echo "8080");"
+echo -e "        proxy_set_header Host \$host;"
+echo -e "        proxy_set_header X-Real-IP \$remote_addr;"
+echo -e "        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
+echo -e "        proxy_set_header X-Forwarded-Proto \$scheme;"
+echo -e "    }"
+echo -e "}"
+echo -e "----------------------------------------------------------------"
+echo -e ""
 fi
-echo -e "  🛠 ${BOLD}دستورات مدیریت سرویس:${NC}"
-echo -e "     بررسی وضعیت:  systemctl status telegram-relay"
-echo -e "     ریستارت:      systemctl restart telegram-relay"
-echo -e "     توقف:         systemctl stop telegram-relay"
-echo -e "     لاگ زنده:     journalctl -u telegram-relay -f"
-echo -e "================================================================\n"
+
+echo -e "${BOLD}[ Service Management Commands ]${NC}"
+echo -e "Check Status: systemctl status telegram-relay"
+echo -e "Restart:      systemctl restart telegram-relay"
+echo -e "Stop:         systemctl stop telegram-relay"
+echo -e "Live Logs:    journalctl -u telegram-relay -f"
+echo -e "${GREEN}${BOLD}================================================================${NC}\n"

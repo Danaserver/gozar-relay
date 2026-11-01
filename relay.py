@@ -47,7 +47,10 @@ HOP_BY_HOP_HEADERS = {
 def get_default_config():
     secret_key = secrets.token_hex(32)
     salt = secrets.token_hex(16)
-    hashed = hashlib.pbkdf2_hmac('sha256', b'Admin@Telo2026', salt.encode('utf-8'), 100000).hex()
+    init_pass = secrets.token_urlsafe(12)
+    hashed = hashlib.pbkdf2_hmac('sha256', init_pass.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
+    init_key = f"key_{secrets.token_hex(6)}"
+    sys.stderr.write(f"\n[INIT] Generated Admin Password: {init_pass}\n[INIT] Generated Bot Key: {init_key}\n\n")
     return {
         "enabled": True,
         "admin": {
@@ -58,8 +61,8 @@ def get_default_config():
         "bot_keys": [
             {
                 "id": "key_default",
-                "name": "ربات پیش‌فرض ۱",
-                "key": f"telo_sec_{secrets.token_hex(4)}",
+                "name": "Default Bot 1",
+                "key": init_key,
                 "enabled": True,
                 "created_at": time.strftime("%Y-%m-%d %H:%M")
             }
@@ -727,7 +730,7 @@ def render_dashboard(ctx, cfg, notice=""):
             </p>
             <pre># ۱. با کتابخانه requests:
 BOT_TOKEN = "123456789:ABC..."
-RELAY_KEY = "کد_اختصاصی_ربات"  # مثلا telo_sec_8a2f4e
+RELAY_KEY = "کد_اختصاصی_ربات"  # مثلا key_8a2f4e19b0
 API_URL = f"{base_url}/{{RELAY_KEY}}/bot{{BOT_TOKEN}}"
 
 response = requests.post(f"{{API_URL}}/sendMessage", json={{"chat_id": 12345, "text": "سلام از سرور ایران!"}})
@@ -893,7 +896,7 @@ def process_http_request(method, req_uri, req_headers, body_bytes, env_dict, cus
             bot_name = form.get("bot_name", "").strip() or "ربات بدون نام"
             custom_key = form.get("custom_key", "").strip()
             if not custom_key:
-                custom_key = f"telo_sec_{secrets.token_hex(4)}"
+                custom_key = f"key_{secrets.token_hex(6)}"
             custom_key = re.sub(r'[^a-zA-Z0-9_\-]', '', custom_key)
             
             new_key = {

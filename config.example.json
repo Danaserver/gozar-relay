@@ -9,7 +9,7 @@
     {
       "id": "key_default",
       "name": "Default Bot",
-      "key": "telo_sec_example123",
+      "key": "sec_key_example123",
       "enabled": true,
       "created_at": "2026-11-01 12:00"
     }

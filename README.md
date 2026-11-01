@@ -100,7 +100,7 @@ https://YOUR_DOMAIN/<BOT_KEY>/bot<BOT_TOKEN>/<METHOD>
 import requests
 
 BOT_TOKEN = "123456789:AAFakeTokenExample"
-RELAY_KEY = "telo_sec_8a2f4e"  # کلید اختصاصی دریافت شده از پنل
+RELAY_KEY = "key_8a2f4e19b0"  # کلید اختصاصی دریافت شده از پنل
 BASE_URL = f"https://your-domain.com/{RELAY_KEY}/bot{BOT_TOKEN}"
 
 # دریافت آپدیت‌ها (Long Polling)
@@ -118,7 +118,7 @@ requests.post(f"{BASE_URL}/sendMessage", json={
 import telebot
 
 BOT_TOKEN = "123456789:AAFakeTokenExample"
-RELAY_KEY = "telo_sec_8a2f4e"
+RELAY_KEY = "key_8a2f4e19b0"
 SERVER = "https://your-domain.com"
 
 telebot.apihelper.API_URL = f"{SERVER}/{RELAY_KEY}/bot{{0}}/{{1}}"
@@ -138,7 +138,7 @@ bot.infinity_polling()
 from telegram.ext import ApplicationBuilder
 
 BOT_TOKEN = "123456789:AAFakeTokenExample"
-RELAY_KEY = "telo_sec_8a2f4e"
+RELAY_KEY = "key_8a2f4e19b0"
 SERVER = "https://your-domain.com"
 
 app = (
@@ -158,7 +158,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 
-RELAY_KEY = "telo_sec_8a2f4e"
+RELAY_KEY = "key_8a2f4e19b0"
 session = AiohttpSession(
     api=TelegramAPIServer.from_base(f"https://your-domain.com/{RELAY_KEY}")
 )
