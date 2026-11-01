@@ -1109,28 +1109,51 @@ class StandaloneHandler(http.server.BaseHTTPRequestHandler):
         # Clean logging
         sys.stderr.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {args[0]} {args[1]} -> {args[2]}\n")
 
-def run_standalone(host="0.0.0.0", port=80, base_path="", ssl_cert=None, ssl_key=None):
+def run_standalone(host="0.0.0.0", port=80, base_path="", ssl_cert=None, ssl_key=None, ssl_port=443):
+    import threading
     StandaloneHandler.custom_base_path = base_path
-    server = ThreadedHTTPServer((host, port), StandaloneHandler)
 
-    protocol = "http"
-    if ssl_cert and ssl_key:
-        ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        ctx.load_cert_chain(certfile=ssl_cert, keyfile=ssl_key)
-        server.socket = ctx.wrap_socket(server.socket, server_side=True)
-        protocol = "https"
+    # Auto-detect default certificate files in application directory if not provided
+    if not ssl_cert or not ssl_key:
+        default_cert = os.path.join(BASE_DIR, "server.crt")
+        default_key = os.path.join(BASE_DIR, "server.key")
+        if os.path.exists(default_cert) and os.path.exists(default_key):
+            ssl_cert, ssl_key = default_cert, default_key
+
+    # 1. Initialize HTTP Server
+    httpd = ThreadedHTTPServer((host, port), StandaloneHandler)
 
     print("=" * 60)
     print(f"⚡ Telegram Bot API Relay & Admin Panel (Standalone Mode)")
-    print(f"🚀 Server running on: {protocol}://{host}:{port}{base_path}")
-    print(f"🔒 Admin Panel: {protocol}://{host}:{port}{base_path}/")
+    print(f"🚀 HTTP Server listening on:  http://{host}:{port}{base_path}")
+
+    # 2. Initialize HTTPS Server if SSL cert & key are available
+    httpsd = None
+    if ssl_cert and ssl_key and os.path.exists(ssl_cert) and os.path.exists(ssl_key):
+        try:
+            httpsd = ThreadedHTTPServer((host, ssl_port), StandaloneHandler)
+            ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_ctx.load_cert_chain(certfile=ssl_cert, keyfile=ssl_key)
+            httpsd.socket = ssl_ctx.wrap_socket(httpsd.socket, server_side=True)
+            print(f"🔒 HTTPS Server listening on: https://{host}:{ssl_port}{base_path}")
+        except Exception as e:
+            print(f"⚠️ Could not start HTTPS on port {ssl_port}: {e}")
+            httpsd = None
+
     print(f"⚙️ Configuration: {CONFIG_FILE}")
     print("=" * 60)
+
+    if httpsd:
+        t_https = threading.Thread(target=httpsd.serve_forever, daemon=True)
+        t_https.start()
+
     try:
-        server.serve_forever()
+        httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down server...")
-        server.server_close()
+        httpd.server_close()
+        if httpsd:
+            httpsd.server_close()
 
 # ----------------- MAIN DISPATCHER -----------------
 

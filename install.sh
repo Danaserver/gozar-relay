@@ -159,13 +159,24 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOF
 
-# 8. Firewall Configuration
+# 8. SSL Self-Signed Certificate & Firewall Configuration
+if [ ! -f "$INSTALL_DIR/server.crt" ]; then
+    echo -e "${BLUE}[*] در حال تولید گواهی خودکار SSL برای پورت 443...${NC}"
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+      -keyout "$INSTALL_DIR/server.key" \
+      -out "$INSTALL_DIR/server.crt" \
+      -subj "/CN=telegram-relay" >/dev/null 2>&1 || true
+    chmod 600 "$INSTALL_DIR/server.key" "$INSTALL_DIR/server.crt" 2>/dev/null || true
+fi
+
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-    echo -e "${BLUE}[*] باز کردن پورت ${PORT} در فایروال UFW...${NC}"
+    echo -e "${BLUE}[*] باز کردن پورت‌های ${PORT} و 443 در فایروال UFW...${NC}"
     ufw allow ${PORT}/tcp >/dev/null 2>&1 || true
+    ufw allow 443/tcp >/dev/null 2>&1 || true
 elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-    echo -e "${BLUE}[*] باز کردن پورت ${PORT} در فایروal firewalld...${NC}"
+    echo -e "${BLUE}[*] باز کردن پورت‌های ${PORT} و 443 در فایروال firewalld...${NC}"
     firewall-cmd --add-port=${PORT}/tcp --permanent >/dev/null 2>&1 || true
+    firewall-cmd --add-port=443/tcp --permanent >/dev/null 2>&1 || true
     firewall-cmd --reload >/dev/null 2>&1 || true
 fi
 
