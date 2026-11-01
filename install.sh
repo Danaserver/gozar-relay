@@ -73,10 +73,33 @@ PYTHON_BIN=$(command -v python3)
 PYTHON_VER=$($PYTHON_BIN --version 2>&1)
 echo -e "${GREEN}[✓] پایتون آماده است: ${PYTHON_VER}${NC}"
 
-# 4. Setup Installation Directory
+# 4. Setup Installation Directory & Server IP
+SERVER_IP=$(curl -s4 --max-time 3 https://api.ipify.org || curl -s4 --max-time 3 https://ifconfig.me || hostname -I | awk '{print $1}')
 INSTALL_DIR="/opt/telegram-relay"
 echo -e "${BLUE}[*] در حال آماده‌سازی دایرکتوری نصب در ${INSTALL_DIR}...${NC}"
 mkdir -p "$INSTALL_DIR"
+
+# 4.1. Domain / Subdomain Setup (Interactive Prompt)
+if [ -z "$DOMAIN" ]; then
+    if [ -e /dev/tty ]; then
+        echo -e "\n${YELLOW}----------------------------------------------------------------${NC}"
+        echo -e "${BOLD}🌐 تنظیم دامنه یا سابدامنه (اختیاری):${NC}"
+        echo -e "اگر سابدامنه یا دامنه‌ای دارید (مانند ${CYAN}relay.yourdomain.com${NC}) که رکورد A آن را به"
+        echo -e "آی‌پی این سرور (${GREEN}${SERVER_IP}${NC}) متصل کرده‌اید، آن را وارد کنید."
+        echo -e "در غیر این صورت، کلید ${BOLD}Enter${NC} را بزنید تا بر روی همین آی‌پی تنظیم شود."
+        read -r -p "دامنه یا سابدامنه (خالی = فقط آی‌پی): " INPUT_DOMAIN </dev/tty || true
+        DOMAIN=$(echo "$INPUT_DOMAIN" | tr -d ' ' | sed -e 's/^https\?:\/\///' -e 's/\/.*$//')
+        echo -e "${YELLOW}----------------------------------------------------------------${NC}\n"
+    fi
+fi
+
+SSL_CN="telegram-relay"
+if [ -n "$DOMAIN" ]; then
+    SSL_CN="$DOMAIN"
+    echo -e "${GREEN}[✓] دامنه انتخاب شده: https://${DOMAIN}/${NC}"
+else
+    echo -e "${BLUE}[*] از آی‌پی سرور (${SERVER_IP}) استفاده می‌شود.${NC}"
+fi
 
 # 5. Obtain relay.py (Local > GitHub Raw > Mirror)
 if [ -f "./relay.py" ]; then
@@ -159,13 +182,13 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOF
 
-# 8. SSL Self-Signed Certificate & Firewall Configuration
+# 8. SSL Certificate & Firewall Configuration
 if [ ! -f "$INSTALL_DIR/server.crt" ]; then
-    echo -e "${BLUE}[*] در حال تولید گواهی خودکار SSL برای پورت 443...${NC}"
+    echo -e "${BLUE}[*] در حال تولید گواهی امنیتی SSL برای ${SSL_CN} روی پورت 443...${NC}"
     openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
       -keyout "$INSTALL_DIR/server.key" \
       -out "$INSTALL_DIR/server.crt" \
-      -subj "/CN=telegram-relay" >/dev/null 2>&1 || true
+      -subj "/CN=${SSL_CN}" >/dev/null 2>&1 || true
     chmod 600 "$INSTALL_DIR/server.key" "$INSTALL_DIR/server.crt" 2>/dev/null || true
 fi
 
@@ -196,11 +219,16 @@ else
     exit 1
 fi
 
-# 10. Detect Server IP
-SERVER_IP=$(curl -s4 --max-time 3 https://api.ipify.org || curl -s4 --max-time 3 https://ifconfig.me || hostname -I | awk '{print $1}')
-SERVER_URL="http://${SERVER_IP}"
-if [ "$PORT" != "80" ]; then
-    SERVER_URL="http://${SERVER_IP}:${PORT}"
+# 10. URL Formatting
+if [ -n "$DOMAIN" ]; then
+    PRIMARY_URL="https://${DOMAIN}"
+    SECONDARY_URL="http://${DOMAIN}"
+else
+    PRIMARY_URL="http://${SERVER_IP}"
+    if [ "$PORT" != "80" ]; then
+        PRIMARY_URL="http://${SERVER_IP}:${PORT}"
+    fi
+    SECONDARY_URL="https://${SERVER_IP}"
 fi
 
 # 11. Final Summary
@@ -208,7 +236,12 @@ echo -e "\n${GREEN}${BOLD}======================================================
 echo -e "${GREEN}${BOLD}      🎉 رله تلگرام با موفقیت روی سرور نصب و فعال شد!          ${NC}"
 echo -e "${GREEN}${BOLD}================================================================${NC}"
 echo -e ""
-echo -e "  🌐 ${BOLD}آدرس پنل مدیریت:${NC}      ${CYAN}${SERVER_URL}/${NC}"
+echo -e "  🌐 ${BOLD}آدرس پنل مدیریت:${NC}      ${CYAN}${PRIMARY_URL}/${NC}"
+if [ -n "$DOMAIN" ]; then
+echo -e "  🔗 ${BOLD}آدرس با آی‌پی:${NC}          ${CYAN}http://${SERVER_IP}/${NC}"
+else
+echo -e "  🔒 ${BOLD}آدرس با SSL:${NC}            ${CYAN}${SECONDARY_URL}/${NC}"
+fi
 echo -e "  👤 ${BOLD}نام کاربری مدیر:${NC}      ${YELLOW}${ADMIN_USER}${NC}"
 if [ -n "$ADMIN_PASS" ]; then
 echo -e "  🔑 ${BOLD}رمز عبور مدیر:${NC}        ${YELLOW}${ADMIN_PASS}${NC}"
@@ -217,7 +250,7 @@ echo -e "  🤖 ${BOLD}کد اختصاصی ربات:${NC}      ${CYAN}${DEFAULT_
 echo -e ""
 echo -e "----------------------------------------------------------------"
 echo -e "  🚀 ${BOLD}نحوه استفاده در کدهای ربات (روی سرور ایران):${NC}"
-echo -e "     API_URL = \"${SERVER_URL}/${DEFAULT_BOT_KEY}/bot<TOKEN>\""
+echo -e "     API_URL = \"${PRIMARY_URL}/${DEFAULT_BOT_KEY}/bot<TOKEN>\""
 echo -e "----------------------------------------------------------------"
 echo -e "  🛠 ${BOLD}دستورات مدیریت سرویس:${NC}"
 echo -e "     بررسی وضعیت:  systemctl status telegram-relay"

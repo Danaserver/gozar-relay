@@ -760,12 +760,38 @@ app = ApplicationBuilder().token(BOT_TOKEN).base_url(f"{base_url}/{{RELAY_KEY}}/
     </div>
 
     <script>
-        function copyText(text) {{
-            navigator.clipboard.writeText(text).then(() => {{
-                const toast = document.getElementById('toast');
+        function showToast() {{
+            const toast = document.getElementById('toast');
+            if (toast) {{
                 toast.style.display = 'block';
                 setTimeout(() => {{ toast.style.display = 'none'; }}, 2000);
-            }});
+            }}
+        }}
+
+        function fallbackCopy(str) {{
+            const el = document.createElement('textarea');
+            el.value = str;
+            el.setAttribute('readonly', '');
+            el.style.position = 'fixed';
+            el.style.left = '-9999px';
+            el.style.top = '0';
+            document.body.appendChild(el);
+            el.select();
+            try {{
+                const successful = document.execCommand('copy');
+                if (successful) showToast();
+            }} catch (err) {{
+                prompt('کپی متن:', str);
+            }}
+            document.body.removeChild(el);
+        }}
+
+        function copyText(text) {{
+            if (navigator.clipboard && window.isSecureContext) {{
+                navigator.clipboard.writeText(text).then(showToast).catch(() => fallbackCopy(text));
+            }} else {{
+                fallbackCopy(text);
+            }}
         }}
     </script>
 </body>
