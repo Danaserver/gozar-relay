@@ -395,7 +395,8 @@ def render_login_page(ctx, err_message=""):
     </div>
 </body>
 </html>"""
-    cookie_header = f"relay_captcha={captcha_token}; Path={ctx['cookie_path']}; HttpOnly; SameSite=Lax; Secure"
+    secure_flag = "; Secure" if ctx.get("proto") == "https" else ""
+    cookie_header = f"relay_captcha={captcha_token}; Path={ctx['cookie_path']}; HttpOnly; SameSite=Lax{secure_flag}"
     return 200, [("Content-Type", "text/html; charset=utf-8"), ("Set-Cookie", cookie_header)], html.encode('utf-8')
 
 def render_dashboard(ctx, cfg, notice=""):
@@ -799,6 +800,7 @@ def process_http_request(method, req_uri, req_headers, body_bytes, env_dict, cus
     ctx = get_request_context(env_dict, custom_base_path)
     base_path = ctx["base_path"]
     cookie_path = ctx["cookie_path"]
+    secure_flag = "; Secure" if ctx.get("proto") == "https" else ""
     
     clean_path = clean_req_path(req_uri, base_path)
     query_string = parse_query(req_uri)
@@ -824,7 +826,7 @@ def process_http_request(method, req_uri, req_headers, body_bytes, env_dict, cus
             admin_cfg = cfg.get("admin", {})
             if uname == admin_cfg.get("username") and verify_password(pword, admin_cfg.get("password_hash")):
                 sess_token = make_session_token(uname, secret)
-                cookie_out = f"relay_session={sess_token}; Path={cookie_path}; HttpOnly; SameSite=Lax; Secure"
+                cookie_out = f"relay_session={sess_token}; Path={cookie_path}; HttpOnly; SameSite=Lax{secure_flag}"
                 redirect_url = f"{base_path}/" if base_path else "/"
                 return 303, [("Location", redirect_url), ("Set-Cookie", cookie_out)], b""
             else:
@@ -832,7 +834,7 @@ def process_http_request(method, req_uri, req_headers, body_bytes, env_dict, cus
 
         # 2. Logout
         if clean_path in ('logout', 'logout/') and method == 'POST':
-            cookie_out = f"relay_session=; Path={cookie_path}; Max-Age=0; HttpOnly; SameSite=Lax; Secure"
+            cookie_out = f"relay_session=; Path={cookie_path}; Max-Age=0; HttpOnly; SameSite=Lax{secure_flag}"
             redirect_url = f"{base_path}/" if base_path else "/"
             return 303, [("Location", redirect_url), ("Set-Cookie", cookie_out)], b""
 
@@ -840,7 +842,7 @@ def process_http_request(method, req_uri, req_headers, body_bytes, env_dict, cus
         if clean_path in ('captcha.svg',):
             secret = cfg.get("secret_jwt_key", "")
             _, c_token, c_svg = generate_captcha(secret)
-            cookie_out = f"relay_captcha={c_token}; Path={cookie_path}; HttpOnly; SameSite=Lax; Secure"
+            cookie_out = f"relay_captcha={c_token}; Path={cookie_path}; HttpOnly; SameSite=Lax{secure_flag}"
             return 200, [("Content-Type", "image/svg+xml"), ("Set-Cookie", cookie_out)], c_svg.encode('utf-8')
 
         # Authentication check
@@ -906,7 +908,7 @@ def process_http_request(method, req_uri, req_headers, body_bytes, env_dict, cus
                 cfg['secret_jwt_key'] = secrets.token_hex(32)
                 save_config(cfg)
                 new_token = make_session_token(new_uname, cfg['secret_jwt_key'])
-                cookie_out = f"relay_session={new_token}; Path={cookie_path}; HttpOnly; SameSite=Lax; Secure"
+                cookie_out = f"relay_session={new_token}; Path={cookie_path}; HttpOnly; SameSite=Lax{secure_flag}"
                 status, headers, body = render_dashboard(ctx, cfg, notice="مشخصات ورود مدیر با موفقیت تغییر کرد.")
                 headers.append(("Set-Cookie", cookie_out))
                 return status, headers, body

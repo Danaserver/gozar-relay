@@ -97,7 +97,7 @@ chmod +x "$INSTALL_DIR/relay.py"
 # 6. Initialize Config if not exists
 CONFIG_FILE="$INSTALL_DIR/config.json"
 ADMIN_USER="admin"
-ADMIN_PASS="Admin@$(openssl rand -hex 4 | tr '[:lower:]' '[:upper:]')"
+ADMIN_PASS=${ADMIN_PASS:-"Admin@Telo2026"}
 DEFAULT_BOT_KEY="telo_sec_$(openssl rand -hex 3)"
 
 if [ ! -f "$CONFIG_FILE" ]; then
