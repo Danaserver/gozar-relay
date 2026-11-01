@@ -40,10 +40,35 @@ curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/insta
 > sudo bash install.sh
 > ```
 
-### اجرای روی پورت دلخواه (اختیاری):
-به صورت پیش‌فرض رله روی پورت ۸۰ اجرا می‌شود. برای تغییر پورت (مثلاً ۸۰۸۰):
+### تنظیم پورت‌های دلخواه و نصب در کنار سایر وب‌سرورها (Nginx / Apache / X-UI):
+اسکریپت نصب به صورت خودکار وضعیت پورت‌های سرور را بررسی می‌کند. اگر پورت‌های استاندارد (۸۰ و ۴۴۳) توسط وب‌سرور دیگری در حال استفاده باشند، اسکریپت به شما هشدار داده و پورت‌های جایگزین (مانند ۸۰۸۰ و ۸۴۴۳) را پیشنهاد می‌دهد.
+
+همچنین می‌توانید پورت‌ها را مستقیماً از طریق دستور یا متغیرهای محیطی تعیین کنید:
 ```bash
-PORT=8080 curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
+# نصب با تعیین پورت‌های HTTP و HTTPS:
+PORT=8080 SSL_PORT=8443 curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
+
+# یا با اجرای مستقیم اسکریپت:
+sudo bash install.sh 8080 8443 relay.yourdomain.com
+```
+
+> **نکته برای کلادفلیر (Cloudflare):** اگر سابدامنه خود را از پشت پروکسی کلادفلیر رد می‌کنید، پورت‌های مجاز HTTPS در کلادفلیر عبارتند از: `443, 8443, 2053, 2083, 2087, 2096` و پورت‌های مجاز HTTP: `80, 8080, 8880`.
+
+#### اتصال از طریق Nginx Reverse Proxy (در صورت وجود وب‌سرور روی سرور):
+اگر روی سرورتان از قبل Nginx روی پورت‌های ۸۰ و ۴۴۳ فعال است، کافیست رله را مثلاً روی پورت `8080` اجرا کنید و یک بلوک ساده در تنظیمات Nginx اضافه نمایید:
+```nginx
+server {
+    listen 80;
+    server_name relay.yourdomain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 اسکریپت پس از اتمام نصب، سرویس `telegram-relay` را در `systemd` ایجاد و فعال کرده و آدرس پنل، نام کاربری و رمز عبور تصادفی تولیدشده را نمایش می‌دهد.
@@ -198,9 +223,35 @@ Run the following command as `root` on any fresh Ubuntu, Debian, CentOS, or Alma
 curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
 ```
 
-### Custom Port (Optional):
+### Custom Ports & Co-existence with Existing Services (Nginx / Apache / X-UI):
+The installer automatically detects whether ports 80 and 443 are already bound by existing services. If occupied, it warns you and suggests safe alternatives (such as `8080` and `8443`).
+
+You can also explicitly pass custom HTTP and HTTPS ports via environment variables or CLI arguments:
 ```bash
-PORT=8080 curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
+# Pass custom HTTP & HTTPS ports:
+PORT=8080 SSL_PORT=8443 curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
+
+# Or when running the script directly:
+sudo bash install.sh 8080 8443 relay.yourdomain.com
+```
+
+> **Cloudflare Note:** When proxying behind Cloudflare, supported HTTPS ports are `443, 8443, 2053, 2083, 2087, 2096` and HTTP ports are `80, 8080, 8880`.
+
+#### Nginx Reverse Proxy Example (Optional):
+If Nginx is already bound to ports 80 and 443, run Telegram Relay on an internal port (e.g. `8080`) and forward requests from your domain:
+```nginx
+server {
+    listen 80;
+    server_name relay.yourdomain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ---

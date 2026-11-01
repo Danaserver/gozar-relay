@@ -873,12 +873,12 @@ def process_http_request(method, req_uri, req_headers, body_bytes, env_dict, cus
 
         # Authentication check
         if not is_admin_auth(cfg, cookie_hdr):
-            if clean_path in ('', 'dashboard', 'admin'):
+            if clean_path in ('', 'dashboard', 'admin', 'login', 'login/'):
                 return render_login_page(ctx)
             return 401, [("Content-Type", "application/json")], json.dumps({"error": "Unauthorized"}).encode()
 
         # Authenticated Admin Dashboard & API Actions
-        if clean_path in ('', 'dashboard', 'admin'):
+        if clean_path in ('', 'dashboard', 'admin', 'login', 'login/'):
             notice = env_dict.get("HTTP_X_NOTICE", "")
             return render_dashboard(ctx, cfg, notice)
 
@@ -1094,13 +1094,15 @@ class StandaloneHandler(http.server.BaseHTTPRequestHandler):
             length = int(cl_hdr)
         body = self.rfile.read(length) if length > 0 else b""
 
+        is_ssl = isinstance(self.connection, ssl.SSLSocket) or getattr(self.server, 'is_ssl', False)
         env_dict = {
             'REQUEST_METHOD': method,
             'REQUEST_URI': self.path,
             'HTTP_HOST': self.headers.get('Host', 'localhost'),
             'HTTP_COOKIE': self.headers.get('Cookie', ''),
             'SERVER_PORT': str(self.server.server_port),
-            'REMOTE_ADDR': self.client_address[0]
+            'REMOTE_ADDR': self.client_address[0],
+            'HTTPS': 'on' if is_ssl else 'off'
         }
         for k, v in self.headers.items():
             env_dict[f"HTTP_{k.upper().replace('-', '_')}"] = v
@@ -1135,7 +1137,7 @@ class StandaloneHandler(http.server.BaseHTTPRequestHandler):
         # Clean logging
         sys.stderr.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {args[0]} {args[1]} -> {args[2]}\n")
 
-def run_standalone(host="0.0.0.0", port=80, base_path="", ssl_cert=None, ssl_key=None, ssl_port=443):
+def run_standalone(host="0.0.0.0", port=80, ssl_port=443, base_path="", ssl_cert=None, ssl_key=None):
     import threading
     StandaloneHandler.custom_base_path = base_path
 
@@ -1146,40 +1148,66 @@ def run_standalone(host="0.0.0.0", port=80, base_path="", ssl_cert=None, ssl_key
         if os.path.exists(default_cert) and os.path.exists(default_key):
             ssl_cert, ssl_key = default_cert, default_key
 
-    # 1. Initialize HTTP Server
-    httpd = ThreadedHTTPServer((host, port), StandaloneHandler)
+    servers = []
+
+    # 1. Initialize HTTP Server (if port > 0)
+    httpd = None
+    if port is not None and int(port) > 0:
+        try:
+            httpd = ThreadedHTTPServer((host, int(port)), StandaloneHandler)
+            httpd.is_ssl = False
+            servers.append(("HTTP", httpd, f"http://{host}:{port}{base_path}"))
+        except Exception as e:
+            print(f"❌ Could not start HTTP server on {host}:{port}: {e}")
+    else:
+        print("⚪ HTTP server is disabled (port=0).")
+
+    # 2. Initialize HTTPS Server (if ssl_port > 0 and certs exist)
+    httpsd = None
+    if ssl_port is not None and int(ssl_port) > 0:
+        if ssl_cert and ssl_key and os.path.exists(ssl_cert) and os.path.exists(ssl_key):
+            try:
+                httpsd = ThreadedHTTPServer((host, int(ssl_port)), StandaloneHandler)
+                httpsd.is_ssl = True
+                ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                ssl_ctx.load_cert_chain(certfile=ssl_cert, keyfile=ssl_key)
+                httpsd.socket = ssl_ctx.wrap_socket(httpsd.socket, server_side=True)
+                servers.append(("HTTPS", httpsd, f"https://{host}:{ssl_port}{base_path}"))
+            except Exception as e:
+                print(f"❌ Could not start HTTPS server on {host}:{ssl_port}: {e}")
+        else:
+            print(f"⚠️ SSL certificate/key not found. HTTPS server on port {ssl_port} not started.")
+    else:
+        print("⚪ HTTPS server is disabled (ssl_port=0).")
+
+    if not servers:
+        print("❌ Error: No server could be started. Please check ports and SSL files.")
+        sys.exit(1)
 
     print("=" * 60)
-    print(f"⚡ Telegram Bot API Relay & Admin Panel (Standalone Mode)")
-    print(f"🚀 HTTP Server listening on:  http://{host}:{port}{base_path}")
-
-    # 2. Initialize HTTPS Server if SSL cert & key are available
-    httpsd = None
-    if ssl_cert and ssl_key and os.path.exists(ssl_cert) and os.path.exists(ssl_key):
-        try:
-            httpsd = ThreadedHTTPServer((host, ssl_port), StandaloneHandler)
-            ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_ctx.load_cert_chain(certfile=ssl_cert, keyfile=ssl_key)
-            httpsd.socket = ssl_ctx.wrap_socket(httpsd.socket, server_side=True)
-            print(f"🔒 HTTPS Server listening on: https://{host}:{ssl_port}{base_path}")
-        except Exception as e:
-            print(f"⚠️ Could not start HTTPS on port {ssl_port}: {e}")
-            httpsd = None
-
+    print("⚡ Telegram Bot API Relay & Admin Panel (Standalone Mode)")
+    for proto, srv, url in servers:
+        icon = "🌐" if proto == "HTTP" else "🔒"
+        print(f"{icon} {proto} Server listening on:  {url}")
     print(f"⚙️ Configuration: {CONFIG_FILE}")
     print("=" * 60)
 
-    if httpsd:
-        t_https = threading.Thread(target=httpsd.serve_forever, daemon=True)
-        t_https.start()
+    # Start all servers except the last one in background threads
+    for proto, srv, url in servers[:-1]:
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
 
+    # Serve the last one on the main thread so Ctrl+C / SIGINT cleanly stops
+    last_proto, last_srv, last_url = servers[-1]
     try:
-        httpd.serve_forever()
+        last_srv.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down server...")
-        httpd.server_close()
-        if httpsd:
-            httpsd.server_close()
+        for _, srv, _ in servers:
+            try:
+                srv.server_close()
+            except Exception:
+                pass
 
 # ----------------- MAIN DISPATCHER -----------------
 
@@ -1192,7 +1220,8 @@ def main():
     # Otherwise, run Standalone CLI mode
     parser = argparse.ArgumentParser(description="Telegram Bot API Relay & Admin Panel Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host interface to bind (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=80, help="Port to listen on (default: 80)")
+    parser.add_argument("--port", type=int, default=80, help="HTTP port to listen on (default: 80, 0 to disable)")
+    parser.add_argument("--ssl-port", type=int, default=443, help="HTTPS port to listen on (default: 443, 0 to disable)")
     parser.add_argument("--base-path", default="", help="Base URL path prefix (default: '')")
     parser.add_argument("--ssl-cert", default=None, help="Path to SSL certificate file (.crt or .pem)")
     parser.add_argument("--ssl-key", default=None, help="Path to SSL private key file (.key)")
@@ -1201,6 +1230,7 @@ def main():
     run_standalone(
         host=args.host,
         port=args.port,
+        ssl_port=args.ssl_port,
         base_path=args.base_path,
         ssl_cert=args.ssl_cert,
         ssl_key=args.ssl_key
