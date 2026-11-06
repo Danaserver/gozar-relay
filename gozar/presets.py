@@ -113,7 +113,7 @@ PRESETS = [
 PRESETS_BY_ID = {p["preset"]: p for p in PRESETS}
 
 # Services created on first run.
-DEFAULT_SERVICES = ("telegram", "openrouter", "gemini")
+DEFAULT_SERVICES = ("telegram", "openrouter", "gemini", "anthropic", "groq")
 
 AUTH_TYPES = ("none", "bearer", "header", "query")
 

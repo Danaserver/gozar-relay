@@ -165,6 +165,17 @@ class RelayTests(unittest.TestCase):
         finally:
             st.delete_service(svc["id"])
 
+    def test_host_style_routing(self):
+        host = "127.0.0.1:{}".format(self.up.server_port)
+        s, _, j = self.jcall("/{}/api/v1/chat/completions".format(host), "POST",
+                             {"X-Relay-Key": self.key, "Authorization": "Bearer provider-key"}, b"{}")
+        self.assertEqual(s, 200)
+        self.assertEqual(j["path"], "/api/v1/chat/completions")
+        s, _, _ = self.jcall("/{}/{}/x".format(self.key, host))
+        self.assertEqual(s, 200)
+        s, _, _ = self.jcall("/evil.example.com/x", headers={"X-Relay-Key": self.key})
+        self.assertEqual(s, 404)
+
     # -------------------------------------------------------------- policy
 
     def test_service_restriction(self):
@@ -289,7 +300,7 @@ class CgiAndMigrationTests(unittest.TestCase):
             self.assertEqual(st.get("admin_username"), "boss")
             k = st.get_key(key="key_0123456789")
             self.assertEqual(k["services"], "telegram")
-            self.assertEqual([s["slug"] for s in st.list_services()], ["telegram", "openrouter", "gemini"])
+            self.assertEqual([s["slug"] for s in st.list_services()], ["telegram", "openrouter", "gemini", "anthropic", "groq"])
             st.close()
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

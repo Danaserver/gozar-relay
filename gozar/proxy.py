@@ -8,6 +8,7 @@ Supported URL shapes (all equivalent):
     /<service>/<upstream path>                        key in a header / query
     /<ACCESS_KEY>/bot<TOKEN>/<method>                 legacy v1 Telegram form
     /<ACCESS_KEY>/file/bot<TOKEN>/<file path>         legacy v1 Telegram files
+    /<upstream host>/<full upstream path>             Worker-style (e.g. /openrouter.ai/api/v1/...)
 
 Where the key may be sent instead of the path:
     X-Relay-Key: <key>          ?relay_key=<key>
@@ -17,6 +18,7 @@ Where the key may be sent instead of the path:
 import http.client
 import json
 import random
+import re
 import socket
 import ssl
 import time
@@ -90,6 +92,23 @@ def _remainder(path, consumed):
     return "/" + rest
 
 
+def _service_by_host(store, segment):
+    """
+    Worker-style routing: /<upstream host>/<full upstream path>. Only hosts that
+    belong to a configured service are accepted, so the relay never becomes an
+    open proxy. The service's own base path is ignored (the client sends it).
+    """
+    if "." not in segment or not re.match(r"^[A-Za-z0-9.\-]+(:\d+)?$", segment):
+        return None
+    for s in store.list_services():
+        parts = urllib.parse.urlsplit(s["upstream"])
+        if parts.netloc.lower() == segment.lower():
+            svc = dict(s)
+            svc["upstream"] = "{}://{}".format(parts.scheme, parts.netloc)
+            return svc
+    return None
+
+
 def _telegram_service(store):
     svc = store.get_service(slug="telegram")
     if svc:
@@ -123,6 +142,7 @@ def resolve(req, store):
             key_source = "path"
             nxt = segs[1] if len(segs) > 1 else ""
             svc = store.get_service(slug=nxt) if nxt and security.SLUG_PATTERN.match(nxt) else None
+            svc = svc or (_service_by_host(store, nxt) if nxt else None)
             if svc:
                 service, consumed = svc, 2
             elif nxt.startswith("bot") or nxt == "file":
@@ -131,6 +151,8 @@ def resolve(req, store):
                 raise RelayError(404, "Unknown service. Use /<key>/<service>/...")
         elif segs[0].startswith("bot") or segs[0] == "file":
             service, consumed = _telegram_service(store), 0
+        elif _service_by_host(store, segs[0]):
+            service, consumed = _service_by_host(store, segs[0]), 1
         else:
             raise RelayError(404, "Unknown service or access key")
 
