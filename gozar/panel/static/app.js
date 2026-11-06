@@ -324,7 +324,9 @@
       '<div><h4 style="margin-bottom:8px">۲. کلید در هدر</h4>' + codeBlock(b + '/<service>/<path>\nX-Relay-Key: ' + K) + '</div></div>' +
       '<div class="alert alert-info" style="margin-top:16px;margin-bottom:0"><b>دو حالت برای کلید API سرویس:</b><br>' +
       '• <b>عبوری</b>: کاربر کلید API خودش را مثل همیشه می‌فرستد و رله فقط آن را منتقل می‌کند.<br>' +
-      '• <b>مدیریت‌شده</b>: کلید API (یا چند کلید برای چرخش) در رله ذخیره می‌شود؛ کاربر به جای آن فقط <b>کلید دسترسی رله</b> را به عنوان api_key می‌فرستد و کلید اصلی هیچ‌وقت به سرور ایران نمی‌رسد.</div></div>' +
+      '• <b>مدیریت‌شده</b>: کلید API (یا چند کلید برای چرخش) در رله ذخیره می‌شود؛ کاربر به جای آن فقط <b>کلید دسترسی رله</b> را به عنوان api_key می‌فرستد و کلید اصلی هیچ‌وقت به سرور ایران نمی‌رسد.</div>' +
+      '<div class="alert alert-info" style="margin-top:12px;margin-bottom:0"><b>سازگار با رله‌های Cloudflare Worker:</b> برنامه‌هایی که آدرس را به شکل <code>' + esc(b) + '/&lt;host&gt;/&lt;path&gt;</code> می‌سازند و کلید را با هدر <code>X-Relay-Key</code> می‌فرستند (مثل حامی‌کار) بدون تغییر کار می‌کنند؛ کافیست سرویسی با همان host تعریف شده باشد.<br>' +
+      '<b>متغیرها:</b> در ویرایش هر سرویس و هر کلید می‌توانید متغیر، هدر و پارامتر اضافه تعریف کنید تا همراه همهٔ درخواست‌ها به مقصد ارسال شود.</div></div>' +
       st.services.map(function (s) {
         return '<div class="card"><div class="card-head"><h2><span class="svc-icon" style="width:32px;height:32px;border-radius:9px">' + brand(s.preset) + '</span>' + esc(s.name) + ' <code class="small dim">/' + esc(s.slug) + '</code></h2>' +
           (s.managed ? '<span class="badge b-info">مدیریت‌شده</span>' : '<span class="badge b-mute">عبوری</span>') + '</div>' + snippetTabs(s, k) + '</div>';
@@ -400,7 +402,7 @@
   function serviceForm(svc, preset) {
     var isNew = !svc;
     var p = preset || S.state.presets.filter(function (x) { return x.preset === (svc ? svc.preset : 'custom'); })[0];
-    var v = svc || { slug: p.slug, name: p.name, upstream: p.upstream, auth_type: p.auth_type, auth_name: p.auth_name, timeout: p.timeout, enabled: true, cors: false, note: '', upstream_keys: [], preset: p.preset };
+    var v = svc || { slug: p.slug, name: p.name, upstream: p.upstream, auth_type: p.auth_type, auth_name: p.auth_name, timeout: p.timeout, enabled: true, cors: false, note: '', upstream_keys: [], preset: p.preset, variables: p.variables || '', headers: p.headers || '', params: '' };
     if (isNew && S.state.services.some(function (s) { return s.slug === v.slug; })) v.slug = v.slug ? v.slug + '-2' : '';
     var auth = [['none', 'هیچ'], ['bearer', 'Authorization: Bearer'], ['header', 'هدر سفارشی'], ['query', 'پارامتر Query']];
     var body = '<form id="f-svc" class="form-grid">' +
@@ -416,6 +418,13 @@
       field('Timeout (ثانیه)', '<input class="input ltr" type="number" name="timeout" min="5" max="900" value="' + esc(v.timeout) + '">') +
       '<div class="field"><label>&nbsp;</label><div class="row"><label class="switch"><input type="checkbox" name="enabled"' + (v.enabled ? ' checked' : '') + '><span class="track"></span>فعال</label>' +
       '<label class="switch"><input type="checkbox" name="cors"' + (v.cors ? ' checked' : '') + '><span class="track"></span>CORS (مرورگر)</label></div></div>' +
+      '<div class="full alert alert-info" style="margin:0"><b>متغیرها و داده‌های ارسالی (مثل Environment Variables در Cloudflare Worker)</b><br><span class="small">' +
+        'متغیرها را با <code>NAME=value</code> تعریف کنید و در هدرها، پارامترها، آدرس مقصد و کلید API با <code>{{NAME}}</code> استفاده کنید. ' +
+        'متغیرهای هر کلید دسترسی روی متغیرهای سرویس اولویت دارند. متغیرهای آماده: <code>{{KEY_NAME}}</code>، <code>{{KEY_ID}}</code>، <code>{{SERVICE}}</code>. ' +
+        'مقدار متغیرهایی که نامشان KEY، SECRET، TOKEN یا PASS دارد در پنل مخفی نمایش داده می‌شود.</span></div>' +
+      field('متغیرها', '<textarea class="input ltr mono" name="variables" rows="3" placeholder="SITE_NAME=Hamicar&#10;ACCOUNT_ID=abc123">' + esc(v.variables) + '</textarea>', 'هر خط: NAME=value', true) +
+      field('هدرهای اضافه', '<textarea class="input ltr mono" name="headers" rows="3" placeholder="X-Title: {{SITE_NAME}}&#10;anthropic-version?: 2023-06-01">' + esc(v.headers) + '</textarea>', 'Header: value — با ? بعد از نام فقط وقتی برنامه نفرستاده باشد؛ مقدار خالی = حذف هدر', true) +
+      field('پارامترهای Query اضافه', '<textarea class="input ltr mono" name="params" rows="2" placeholder="source={{KEY_NAME}}">' + esc(v.params) + '</textarea>', 'هر خط: name=value', true) +
       field('یادداشت', '<input class="input" name="note" value="' + esc(v.note) + '">', '', true) + '</form>';
     var m = modal((isNew ? 'افزودن ' : 'ویرایش ') + esc(v.name), body, '<button class="btn btn-primary" id="save">ذخیره</button><button class="btn" data-act="close-modal">انصراف</button>', true);
     $('#save', m).onclick = function () {
@@ -426,7 +435,7 @@
   }
 
   function keyForm(k) {
-    var v = k || { name: '', services: ['*'], rate_limit: 0, note: '', enabled: true, expires_at: 0 };
+    var v = k || { name: '', services: ['*'], rate_limit: 0, note: '', enabled: true, expires_at: 0, variables: '' };
     var all = v.services.indexOf('*') >= 0;
     var exp = v.expires_at ? new Date(v.expires_at * 1000).toISOString().slice(0, 10) : '';
     var chips = '<label class="chip' + (all ? ' on' : '') + '"><input type="checkbox" data-multi="1" name="services" value="*"' + (all ? ' checked' : '') + '>همه</label>' +
@@ -440,6 +449,8 @@
       field('سرویس‌های مجاز', '<div class="chips">' + chips + '</div>', '', true) +
       field('تاریخ انقضا (اختیاری)', '<input class="input ltr" type="date" name="expires" value="' + exp + '">') +
       field(k ? 'کلید' : 'کلید دلخواه (اختیاری)', k ? '<div class="row"><span class="key-pill">' + esc(k.key) + '</span><button type="button" class="btn btn-sm" data-act="rotate-key" data-id="' + k.id + '">' + icon('refresh') + 'تولید کلید جدید</button></div>' : '<input class="input ltr" name="key" placeholder="خالی = تولید خودکار">') +
+      field('متغیرهای اختصاصی این کلید', '<textarea class="input ltr mono" name="variables" rows="3" placeholder="SITE_NAME=Hamicar&#10;OPENROUTER_KEY=sk-or-...">' + esc(v.variables) + '</textarea>',
+        'روی متغیرهای هم‌نام سرویس اولویت دارند. مثلاً اگر کلید API سرویس را <code>{{OPENROUTER_KEY}}</code> بگذارید، هر کلید دسترسی با کلید API خودش کار می‌کند.', true) +
       field('یادداشت', '<input class="input" name="note" value="' + esc(v.note) + '">', '', true) +
       '<div class="field full"><label class="switch"><input type="checkbox" name="enabled"' + (v.enabled ? ' checked' : '') + '><span class="track"></span>فعال</label></div></form>';
     var m = modal(k ? 'ویرایش کلید' : 'کلید دسترسی جدید', body, '<button class="btn btn-primary" id="save">ذخیره</button><button class="btn" data-act="close-modal">انصراف</button>');
@@ -509,7 +520,7 @@
     'snip-key': function (el) { snippetForKey(keyById(el.dataset.id)); },
     'toggle-key': function (el) {
       var k = keyById(el.dataset.id);
-      api('keys/save', { id: k.id, name: k.name, services: k.services, rate_limit: k.rate_limit, note: k.note, enabled: !k.enabled })
+      api('keys/save', { id: k.id, name: k.name, services: k.services, rate_limit: k.rate_limit, note: k.note, variables: k.variables, enabled: !k.enabled })
         .then(function () { toast('وضعیت کلید تغییر کرد'); load(); }).catch(function (e) { toast(e.message, true); });
     },
     'rotate-key': function (el) {

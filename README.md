@@ -163,6 +163,28 @@ curl https://relay.telo.ir/myapi/v1/items -H "X-Relay-Key: gz_xxx"
 
 نمونه‌های کامل در پوشهٔ [`examples/`](examples).
 
+### سازگار با رله‌های Cloudflare Worker
+
+برنامه‌هایی که آدرس را به شکل `<relay>/<host>/<path>` می‌سازند و کلید را با هدر `X-Relay-Key` می‌فرستند (مثل حامی‌کار) بدون تغییر کار می‌کنند. فقط hostهایی که به عنوان سرویس تعریف شده‌اند عبور داده می‌شوند:
+
+```bash
+curl https://relay.telo.ir/openrouter.ai/api/v1/models -H "X-Relay-Key: gz_xxx"
+```
+
+### متغیرها، هدرها و پارامترهای اختصاصی
+
+مثل Environment Variables در Cloudflare Worker، برای هر سرویس **و** هر کلید دسترسی می‌توانید داده تعریف کنید که همراه درخواست‌ها به مقصد برود:
+
+| فیلد | قالب | نمونه |
+|---|---|---|
+| متغیرها | `NAME=value` | `SITE_NAME=Hamicar` |
+| هدرهای اضافه | `Header: value` (با `?` = فقط اگر برنامه نفرستاده؛ مقدار خالی = حذف) | `X-Title?: {{SITE_NAME}}` |
+| پارامترهای Query | `name=value` | `source={{KEY_NAME}}` |
+
+- `{{NAME}}` در هدرها، پارامترها، مسیر آدرس مقصد و کلید API مدیریت‌شده قابل استفاده است (مثلاً `https://api.cloudflare.com/client/v4/accounts/{{ACCOUNT_ID}}/ai`).
+- متغیرهای کلید روی متغیرهای سرویس اولویت دارند. اگر کلید API سرویس را `{{OPENROUTER_KEY}}` بگذارید، هر کلید دسترسی با کلید API خودش کار می‌کند.
+- متغیرهای آماده: `{{KEY_NAME}}`، `{{KEY_ID}}`، `{{SERVICE}}`. مقدار متغیرهایی که نامشان KEY/SECRET/TOKEN/PASS دارد در پنل مخفی است.
+
 ---
 
 ## ساختار پروژه

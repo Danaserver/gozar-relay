@@ -6,7 +6,7 @@ import os
 import re
 import time
 
-from .. import __version__, paths, presets, proxy, security
+from .. import __version__, paths, presets, proxy, security, variables
 from ..http import Response, html_response, json_response, redirect
 
 SESSION_COOKIE = "gozar_session"
@@ -142,6 +142,9 @@ def _service_view(s):
     out["managed"] = bool(keys)
     out["enabled"] = bool(s["enabled"])
     out["cors"] = bool(s["cors"])
+    out["variables"] = variables.to_text(variables.load(s.get("variables")), "vars", mask=True)
+    out["headers"] = variables.to_text(variables.load(s.get("headers")), "headers")
+    out["params"] = variables.to_text(variables.load(s.get("params")), "params")
     return out
 
 
@@ -149,6 +152,7 @@ def _key_view(k):
     out = dict(k)
     out["enabled"] = bool(k["enabled"])
     out["services"] = [s.strip() for s in (k["services"] or "*").split(",") if s.strip()]
+    out["variables"] = variables.to_text(variables.load(k.get("variables")), "vars", mask=True)
     return out
 
 
@@ -295,6 +299,14 @@ def save_service(store, data):
         record["upstream_keys"] = "\n".join(
             k.strip() for k in data["upstream_keys"].splitlines() if k.strip())
 
+    old_vars = variables.load((current or {}).get("variables"))
+    for field, kind in (("variables", "vars"), ("headers", "headers"), ("params", "params")):
+        if field in data:
+            parsed = variables.parse(data.get(field), kind)
+            if kind == "vars":
+                parsed = variables.merge_secrets(parsed, old_vars)
+            record[field] = variables.dump(parsed)
+
     if current:
         if current["slug"] != slug:
             _rename_service_in_keys(store, current["slug"], slug)
@@ -340,8 +352,13 @@ def save_key(store, data):
             raise ValueError("این کلید قابل استفاده نیست")
         record["key"] = custom
 
+    current = store.get_key(key_id=kid) if kid else None
+    if "variables" in data:
+        record["variables"] = variables.dump(variables.merge_secrets(
+            variables.parse(data.get("variables"), "vars"), variables.load((current or {}).get("variables"))))
+
     if kid:
-        if not store.get_key(key_id=kid):
+        if not current:
             raise ValueError("کلید پیدا نشد")
         return store.update_key(kid, record)
     return store.add_key(record)

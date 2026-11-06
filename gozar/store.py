@@ -7,7 +7,7 @@ import sqlite3
 import threading
 import time
 
-from . import paths, presets, security
+from . import paths, presets, security, variables
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
@@ -75,8 +75,25 @@ DEFAULT_SETTINGS = {
 }
 
 SERVICE_FIELDS = ("slug", "name", "preset", "upstream", "auth_type", "auth_name",
-                  "upstream_keys", "timeout", "enabled", "cors", "note")
-KEY_FIELDS = ("name", "key", "services", "enabled", "rate_limit", "expires_at", "note")
+                  "upstream_keys", "timeout", "enabled", "cors", "note",
+                  "variables", "headers", "params")
+KEY_FIELDS = ("name", "key", "services", "enabled", "rate_limit", "expires_at", "note", "variables")
+
+# Columns added after v2.0.0: (table, column, definition)
+MIGRATIONS = [
+    ("services", "variables", "TEXT NOT NULL DEFAULT '{}'"),
+    ("services", "headers", "TEXT NOT NULL DEFAULT '{}'"),
+    ("services", "params", "TEXT NOT NULL DEFAULT '{}'"),
+    ("access_keys", "variables", "TEXT NOT NULL DEFAULT '{}'"),
+]
+
+
+def preset_record(preset_id):
+    p = presets.get_preset(preset_id)
+    rec = {k: p[k] for k in ("slug", "name", "preset", "upstream", "auth_type", "auth_name", "timeout")}
+    rec["variables"] = variables.dump(variables.parse(p.get("variables", ""), "vars"))
+    rec["headers"] = variables.dump(variables.parse(p.get("headers", ""), "headers"))
+    return rec
 
 
 def _row(row):
@@ -93,6 +110,10 @@ class Store:
         with self._init_lock:
             db = self.db
             db.executescript(SCHEMA)
+            for table, column, definition in MIGRATIONS:
+                cols = {r["name"] for r in db.execute("PRAGMA table_info({})".format(table))}
+                if column not in cols:
+                    db.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, column, definition))
             db.commit()
         try:
             os.chmod(self.path, 0o600)
@@ -154,9 +175,7 @@ class Store:
 
         if seed_services and not self.list_services():
             for preset_id in presets.DEFAULT_SERVICES:
-                p = presets.get_preset(preset_id)
-                self.add_service({k: p[k] for k in ("slug", "name", "preset", "upstream",
-                                                    "auth_type", "auth_name", "timeout")})
+                self.add_service(preset_record(preset_id))
         if first_key and not self.list_keys():
             result["key"] = self.add_key({"name": "کلید پیش‌فرض", "services": "*"})["key"]
         return result
@@ -215,9 +234,7 @@ class Store:
     def initialize_services_only(self):
         if not self.list_services():
             for preset_id in presets.DEFAULT_SERVICES:
-                p = presets.get_preset(preset_id)
-                self.add_service({k: p[k] for k in ("slug", "name", "preset", "upstream",
-                                                    "auth_type", "auth_name", "timeout")})
+                self.add_service(preset_record(preset_id))
         if self.get("installed_at", 0) == 0:
             self.set("installed_at", int(time.time()))
 

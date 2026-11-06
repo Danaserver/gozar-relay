@@ -176,6 +176,32 @@ class RelayTests(unittest.TestCase):
         s, _, _ = self.jcall("/evil.example.com/x", headers={"X-Relay-Key": self.key})
         self.assertEqual(s, 404)
 
+    def test_variables_headers_params(self):
+        from gozar import variables as V
+        st = self.store
+        svc = st.add_service({
+            "slug": "withvars", "name": "V", "auth_type": "bearer", "auth_name": "Authorization",
+            "upstream": "http://127.0.0.1:{}/acct/{{{{ACCOUNT_ID}}}}".format(self.up.server_port),
+            "upstream_keys": "{{PROVIDER_KEY}}",
+            "variables": V.dump({"ACCOUNT_ID": "a1", "SITE": "Default", "PROVIDER_KEY": "svc-key"}),
+            "headers": V.dump({"X-Title": "{{SITE}} via {{KEY_NAME}}", "X-Ver?": "1", "X-Drop": ""}),
+            "params": V.dump({"src": "{{SERVICE}}"})})
+        k = st.add_key({"name": "Hamicar", "services": "*",
+                        "variables": V.dump({"SITE": "Hamicar", "PROVIDER_KEY": "key-own"})})
+        try:
+            s, _, j = self.jcall("/{}/withvars/v1/x?a=1".format(k["key"]),
+                                 headers={"X-Ver": "client", "X-Drop": "bye"})
+            self.assertEqual(s, 200)
+            self.assertEqual(j["path"], "/acct/a1/v1/x?a=1&src=withvars")
+            h = j["headers"]
+            self.assertEqual(h["x-title"], "Hamicar via Hamicar")
+            self.assertEqual(h["x-ver"], "client")
+            self.assertNotIn("x-drop", h)
+            self.assertEqual(h["authorization"], "Bearer key-own")
+        finally:
+            st.delete_service(svc["id"])
+            st.delete_key(k["id"])
+
     # -------------------------------------------------------------- policy
 
     def test_service_restriction(self):
@@ -323,6 +349,21 @@ class CgiAndMigrationTests(unittest.TestCase):
             st.close()
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+class VariablesTests(unittest.TestCase):
+    def test_parse_and_mask(self):
+        from gozar import variables as V
+        self.assertEqual(V.parse("# c\nA=1\nB = two=2\n", "vars"), {"A": "1", "B": "two=2"})
+        self.assertEqual(V.parse("X-T: a: b\nY?: 1", "headers"), {"X-T": "a: b", "Y?": "1"})
+        with self.assertRaises(ValueError):
+            V.parse("bad line", "vars")
+        with self.assertRaises(ValueError):
+            V.parse("Host: x", "headers")
+        old = {"API_KEY": "secret-value-123456"}
+        text = V.to_text(old, "vars", mask=True)
+        self.assertNotIn("secret-value", text)
+        self.assertEqual(V.merge_secrets(V.parse(text, "vars"), old), old)
 
 
 class SecurityTests(unittest.TestCase):

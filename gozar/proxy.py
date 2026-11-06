@@ -24,7 +24,7 @@ import ssl
 import time
 import urllib.parse
 
-from . import security
+from . import security, variables
 from .http import Headers, Response
 
 HOP_BY_HOP = {
@@ -202,11 +202,16 @@ def check_access(store, service, key):
 
 # -------------------------------------------------------------- request build
 
-def build_upstream(req, service, path, key_source):
+def _clean(value):
+    return value.replace(chr(13), "").replace(chr(10), "")
+
+
+def build_upstream(req, service, path, key_source, key=None):
     """Return (url, headers) for the upstream request."""
+    ctx = variables.context(service, key)
     upstream = urllib.parse.urlsplit(service["upstream"])
-    base = upstream.path.rstrip("/")
-    managed_key = pick_upstream_key(service)
+    base = variables.render(upstream.path, ctx).rstrip("/")
+    managed_key = _clean(variables.render(pick_upstream_key(service), ctx))
 
     drop_params = {"relay_key"}
     if key_source and key_source.startswith("query:"):
@@ -218,6 +223,10 @@ def build_upstream(req, service, path, key_source):
     pairs = [(k, v) for k, v in urllib.parse.parse_qsl(req.query, keep_blank_values=True) if k not in drop_params]
     if managed_key and service["auth_type"] == "query" and service["auth_name"]:
         pairs.append((service["auth_name"], managed_key))
+    extra_params = variables.load(service.get("params"))
+    if extra_params:
+        pairs = [(k, v) for k, v in pairs if k not in extra_params]
+        pairs += [(k, variables.render(v, ctx)) for k, v in extra_params.items()]
     query = urllib.parse.urlencode(pairs) if pairs else ""
 
     url = urllib.parse.urlunsplit((upstream.scheme, upstream.netloc, base + path, query, ""))
@@ -235,6 +244,16 @@ def build_upstream(req, service, path, key_source):
             if service["preset"] == "gemini":
                 del headers["Authorization"]
             headers[service["auth_name"]] = managed_key
+    for name, template in variables.load(service.get("headers")).items():
+        only_if_missing = name.endswith("?")
+        name = name.rstrip("?")
+        value = _clean(variables.render(template, ctx))
+        if only_if_missing and name in headers:
+            continue
+        if value:
+            headers[name] = value
+        else:
+            del headers[name]
     headers["Host"] = upstream.netloc
     if "User-Agent" not in headers:
         headers["User-Agent"] = "Gozar-Relay/2"
@@ -303,7 +322,7 @@ def handle(req, store):
             return Response(204, cors_headers(req), b"")
 
         check_access(store, service, key)
-        url, headers = build_upstream(req, service, path, key_source)
+        url, headers = build_upstream(req, service, path, key_source, key)
     except RelayError as exc:
         resp = error_response(exc.status, exc.message, service, exc.code)
         if service and service["cors"]:

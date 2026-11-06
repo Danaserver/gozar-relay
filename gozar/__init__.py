@@ -6,5 +6,5 @@ OpenAI and any other HTTP API through a single, access-controlled gateway.
 Runs as a standalone threaded server (VPS) or as a CGI script (cPanel).
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __all__ = ["__version__"]
