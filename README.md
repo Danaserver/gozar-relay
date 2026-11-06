@@ -161,7 +161,7 @@ print(client.models.generate_content(model="gemini-2.5-flash", contents="سلا�
 curl https://relay.telo.ir/myapi/v1/items -H "X-Relay-Key: gz_xxx"
 ```
 
-نمونه‌های کامل در پوشهٔ [`examples/`](examples).
+نمونه‌های کامل در پوشهٔ [`examples/`](examples) · راهنمای اتصال حامی‌کار: [`docs/HAMICAR.md`](docs/HAMICAR.md)
 
 ### سازگار با رله‌های Cloudflare Worker
 
