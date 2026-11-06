@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>ورود — Gozar Relay</title>
+  <link rel="stylesheet" href="{{base}}/_panel/static/app.css">
+  <link rel="icon" href="{{base}}/_panel/static/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <main class="auth">
+    <div class="auth-card card">
+      <div class="brand">
+        <div class="brand-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+        <div><b>گذر · Gozar Relay</b><span>پنل مدیریت رله یکپارچه API</span></div>
+      </div>
+      {{error}}
+      <form method="post" action="{{base}}/_panel/login" autocomplete="on">
+        <input type="hidden" name="captcha_token" id="captcha_token" value="{{captcha_token}}">
+        <div class="field">
+          <label for="u">نام کاربری</label>
+          <input class="input ltr" id="u" name="username" required autocomplete="username" autofocus>
+        </div>
+        <div class="field">
+          <label for="p">رمز عبور</label>
+          <input class="input ltr" id="p" type="password" name="password" required autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="c">کد امنیتی</label>
+          <div class="captcha">
+            <input class="input ltr" id="c" name="captcha" required maxlength="6" autocomplete="off" style="text-transform:uppercase" placeholder="ABCDE">
+            <div class="img" id="captcha_img" title="برای تصویر جدید کلیک کنید">{{captcha_svg}}</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit" style="padding:11px">ورود به پنل</button>
+      </form>
+      <div class="auth-foot">{{host}} · v{{version}}</div>
+    </div>
+  </main>
+  <script>
+    document.getElementById('captcha_img').addEventListener('click', function () {
+      fetch('{{base}}/_panel/captcha', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+        document.getElementById('captcha_img').innerHTML = d.svg;
+        document.getElementById('captcha_token').value = d.token;
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,27 +1,37 @@
-# Protect config.json from direct HTTP access
-<Files "config.json">
+# Gozar relay — Apache / LiteSpeed (cPanel) configuration
+
+Options -Indexes +ExecCGI +FollowSymLinks
+AddHandler cgi-script .py
+DirectoryIndex relay.py
+
+# Pass the Authorization header through to CGI (needed for OpenAI-style SDKs)
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+</IfModule>
+
+# Disable compression/buffering so streamed (SSE) AI responses arrive live
+<IfModule mod_env.c>
+    SetEnv no-gzip 1
+    SetEnv dont-vary 1
+</IfModule>
+
+<IfModule Litespeed>
+    RewriteEngine On
+    RewriteRule .* - [E=noconntimeout:1,E=noabort:1,E=no-gzip:1]
+</IfModule>
+
+# Never serve internal files directly
+<FilesMatch "(\.(db|db-journal|json|sqlite|log|pem|key|crt|md|sh)|^\.)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
     <IfModule !mod_authz_core.c>
         Order Allow,Deny
         Deny from all
     </IfModule>
-    <IfModule mod_authz_core.c>
-        Require all denied
-    </IfModule>
-</Files>
+</FilesMatch>
 
-# Enable CGI execution for Python
-Options +ExecCGI
-AddHandler cgi-script .py
-
-# LiteSpeed specific optimizations for Telegram long-polling (getUpdates)
-<IfModule Litespeed>
-    RewriteRule .* - [E=noconntimeout:1]
-    RewriteRule .* - [E=noabort:1]
-</IfModule>
-
-# URL Rewriting for Relay and Admin Panel (works on root subdomain or any subfolder)
+# Route every request through the relay (the app itself decides what is public)
 RewriteEngine On
-
-# Do not rewrite static files if any exist
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^(.*)$ relay.py [L,QSA]
+RewriteRule ^relay\.py$ - [L]
+RewriteRule ^ relay.py [L,QSA]

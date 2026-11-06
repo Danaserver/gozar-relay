@@ -1,300 +1,235 @@
-# Telegram Bot API Relay & Admin Panel
+<div align="center">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.7+](https://img.shields.io/badge/python-3.7+-brightgreen.svg)](https://www.python.org/)
+<img src="gozar/panel/static/logo.svg" width="84" alt="Gozar">
 
-[فارسی](#راهنمای-فارسی) | [English](#english-documentation)
+# گذر · Gozar Relay
 
----
+**رلهٔ یکپارچه API برای سرورهای داخل ایران**
+Telegram · OpenRouter · Gemini · OpenAI · Claude · Groq · GitHub · هر API دیگر
 
-<a name="راهنمای-فارسی"></a>
-# راهنمای فارسی
+[![License: MIT](https://img.shields.io/badge/License-MIT-6366f1.svg)](LICENSE)
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-22d3ee.svg)](https://www.python.org/)
+![Zero dependencies](https://img.shields.io/badge/dependencies-0-10b981.svg)
 
-یک رله (پروکسی معکوس شفاف) سبک و مستقل برای ارتباط ربات‌های تلگرام روی سرورهای داخل ایران با `api.telegram.org`، به همراه پنل مدیریت تحت وب محافظت‌شده با کپچا و سیستم احراز هویت اختصاصی برای هر ربات.
+[فارسی](#فارسی) · [English](#english)
 
-### چرا این پروژه؟
-در سرورهای داخل ایران به دلیل فیلترینگ تلگرام، ارتباط مستقیم با `api.telegram.org` مسدود است. این ابزار روی یک سرور خارج از کشور (VPS لینوکس یا هاست cPanel) مستقر می‌شود و به عنوان پل ارتباطی امن عمل می‌کند.
-
-### ویژگی‌های کلیدی
-- **نصب با یک دستور روی سرور خام:** نصب خودکار تمام پیش‌نیازها روی اوبونتو، دبیان، سنت‌او‌اس، آلما‌لینوکس و ... حتی اگر پایتون از قبل نصب نباشد.
-- **بدون نیاز به کتابخانه جانبی (Zero Dependencies):** نوشته شده با ماژول‌های استاندارد پایتون ۳ بدون نیاز به `pip install`.
-- **پشتیبانی دوگانه (Dual-Mode):** قابلیت اجرا به عنوان وب‌سرور مستقل چندنخی (Multi-Threaded) روی VPS و یا به صورت اسکریپت CGI روی هاست‌های اشتراکی cPanel / LiteSpeed / Apache.
-- **تشخیص خودکار دامنه و سابدامنه:** بدون نیاز به هاردکد کردن دامنه؛ سیستم آدرس پایه و پروتکل را پویا تشخیص می‌دهد.
-- **کد امنیتی اختصاصی برای هر ربات:** امکان تعریف، فعال/غیرفعال کردن یا حذف کلید مجزا برای هر ربات جهت جلوگیری از سوءاستفاده دیگران.
-- **پنل مدیریت تحت وب:** مشاهده وضعیت اتصال به تلگرام، سوییچ سراسری قطع/وصل (Master Switch)، مدیریت کلیدها و تغییر رمز عبور.
-- **کپچای پویا (SVG):** کد امنیتی ضد ربات بدون وابستگی به کتابخانه‌های سنگین گرافیکی (Pillow).
-- **پشتیبانی کامل از Long-Polling و آپلود فایل:** سازگار با متد `getUpdates` (بدون قطعی تایم‌اوت) و آپلود فایل‌های باینری چندبخشی (عکس، وویس، داکیومنت).
+</div>
 
 ---
 
-## ۱. نصب سریع روی سرور خام (VPS)
+<a name="فارسی"></a>
 
-اگر یک سرور مجازی خارج با سیستم‌عامل اوبونتو، دبیان، سنت‌او‌اس یا آلما‌لینوکس دارید، با دسترسی `root` وارد ترمینال شوید و دستور زیر را اجرا کنید:
+## گذر چیست؟
+
+سرورهای داخل ایران به `api.telegram.org`، OpenRouter، Gemini و خیلی از APIهای دیگر دسترسی ندارند.
+**گذر** را روی یک سرور خارج از ایران (VPS یا هاست cPanel) نصب می‌کنید و برنامه‌های داخل ایران به جای آدرس اصلی، درخواست‌ها را به گذر می‌فرستند. گذر کلید دسترسی را بررسی می‌کند و درخواست را **بدون تغییر و به صورت استریم** به مقصد می‌رساند.
+
+```
+ سرور ایران (ربات / وب‌سایت / حامی‌کار)
+            │  https://relay.telo.ir/<KEY>/<service>/...
+            ▼
+ ┌──────────────────────────┐
+ │        Gozar Relay       │  کلید دسترسی · محدودیت نرخ · لاگ · کلید API مدیریت‌شده
+ └──────────────────────────┘
+      │          │          │
+  Telegram   OpenRouter   Gemini   …هر API دیگر
+```
+
+### امکانات
+
+- **چندسرویسی:** هر تعداد سرویس با شناسهٔ دلخواه (`/telegram`، `/openrouter`، `/gemini`، …) و قالب آماده برای ۷ سرویس معروف + سرویس سفارشی.
+- **کلید دسترسی برای هر برنامه:** فعال/غیرفعال، تعیین سرویس‌های مجاز، محدودیت درخواست در دقیقه، تاریخ انقضا و آمار مصرف.
+- **کلید API مدیریت‌شده:** کلید OpenRouter/Gemini/… را فقط در رله ذخیره کنید؛ برنامه‌ها با کلید رله کار می‌کنند و کلید اصلی هرگز به سرور ایران نمی‌رسد. چند کلید = چرخش خودکار.
+- **سازگار با همهٔ SDKها:** OpenAI SDK، google-genai، anthropic، python-telegram-bot، aiogram، telebot، PHP و cURL — فقط آدرس پایه عوض می‌شود.
+- **استریم کامل:** پاسخ‌های SSE مدل‌های هوش مصنوعی، Long-Polling تلگرام و آپلود/دانلود فایل.
+- **پنل مدیریت فارسی:** داشبورد ترافیک، وضعیت اتصال به سرویس‌ها، مدیریت سرویس‌ها و کلیدها، لاگ درخواست‌ها و کدهای آمادهٔ اتصال برای هر کلید.
+- **امنیت:** ورود با کپچا و قفل ضد brute-force، نشست امضاشده، محافظت CSRF، حذف IP و کوکی کاربر از درخواست‌های خروجی، مخفی شدن توکن ربات در لاگ‌ها.
+- **بدون وابستگی:** فقط کتابخانهٔ استاندارد پایتون ۳.۷+ (SQLite داخلی).
+- **دو حالت اجرا:** سرور مستقل روی VPS (با systemd و Let's Encrypt) یا CGI روی هاست cPanel / LiteSpeed / Apache.
+- **سازگار با نسخهٔ قبلی:** آدرس‌های قدیمی `/<KEY>/bot<TOKEN>/...` بدون تغییر کار می‌کنند و تنظیمات نسخهٔ ۱ خودکار منتقل می‌شوند.
+
+---
+
+## نصب
+
+### ۱. روی VPS (اوبونتو، دبیان، CentOS، Alma، Rocky، Fedora، Alpine، Arch)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Danaserver/gozar-relay/main/install.sh)
 ```
 
-> **نکته:** اگر اسکریپت را از قبل دانلود کرده‌اید، می‌توانید به صورت محلی نیز آن را اجرا کنید:
-> ```bash
-> sudo bash install.sh
-> ```
+اسکریپت دامنه و پورت‌ها را می‌پرسد، اگر پورت ۸۰/۴۴۳ اشغال باشد پورت جایگزین پیشنهاد می‌دهد، برای دامنه گواهی **Let's Encrypt** می‌گیرد (یا گواهی self-signed برای Cloudflare)، سرویس systemd می‌سازد و در پایان آدرس پنل، نام کاربری، رمز و اولین کلید دسترسی را نمایش می‌دهد.
 
-### تنظیم پورت‌های دلخواه و نصب در کنار سایر وب‌سرورها (Nginx / Apache / X-UI):
-اسکریپت نصب به صورت خودکار وضعیت پورت‌های سرور را بررسی می‌کند. اگر پورت‌های استاندارد (۸۰ و ۴۴۳) توسط وب‌سرور دیگری در حال استفاده باشند، اسکریپت به شما هشدار داده و پورت‌های جایگزین (مانند ۸۰۸۰ و ۸۴۴۳) را پیشنهاد می‌دهد.
+نصب بدون پرسش:
 
-همچنین می‌توانید پورت‌ها را مستقیماً از طریق دستور یا متغیرهای محیطی تعیین کنید:
 ```bash
-# نصب با تعیین پورت‌های HTTP و HTTPS:
-PORT=8080 SSL_PORT=8443 curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
-
-# یا با اجرای مستقیم اسکریپت:
-sudo bash install.sh 8080 8443 relay.yourdomain.com
+bash <(curl -fsSL https://raw.githubusercontent.com/Danaserver/gozar-relay/main/install.sh) --domain relay.example.com --port 80 --ssl-port 443 --yes
 ```
 
-> **نکته برای کلادفلیر (Cloudflare):** اگر سابدامنه خود را از پشت پروکسی کلادفلیر رد می‌کنید، پورت‌های مجاز HTTPS در کلادفلیر عبارتند از: `443, 8443, 2053, 2083, 2087, 2096` و پورت‌های مجاز HTTP: `80, 8080, 8880`.
+مدیریت:
 
-#### اتصال از طریق Nginx Reverse Proxy (در صورت وجود وب‌سرور روی سرور):
-اگر روی سرورتان از قبل Nginx روی پورت‌های ۸۰ و ۴۴۳ فعال است، کافیست رله را مثلاً روی پورت `8080` اجرا کنید و یک بلوک ساده در تنظیمات Nginx اضافه نمایید:
-```nginx
-server {
-    listen 80;
-    server_name relay.yourdomain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+```bash
+gozar status            # وضعیت سرویس
+gozar logs              # لاگ زنده
+gozar restart
+gozar update            # بروزرسانی به آخرین نسخه
+gozar info              # خلاصهٔ سرویس‌ها و کلیدها
+gozar reset-password    # رمز جدید برای پنل
+gozar key add --name "ربات فروش" --services telegram
+gozar uninstall
 ```
 
-اسکریپت پس از اتمام نصب، سرویس `telegram-relay` را در `systemd` ایجاد و فعال کرده و آدرس پنل، نام کاربری و رمز عبور تصادفی تولیدشده را نمایش می‌دهد.
+### ۲. روی هاست cPanel (مثلاً `relay.telo.ir`)
+
+یک API Token در cPanel بسازید (Security » Manage API Tokens) و روی کامپیوتر خودتان اجرا کنید:
+
+```bash
+export CPANEL_TOKEN=xxxxxxxxxxxx
+python3 deploy/cpanel_deploy.py --host my-cpanel-host.com --user cpuser --domain relay.telo.ir \
+    --python /opt/alt/python311/bin/python3
+```
+
+اسکریپت سابدامین را می‌سازد، فایل‌ها را آپلود می‌کند، دیتابیس را **بیرون از پوشهٔ وب** (`~/.gozar/relay.telo.ir`) نگه می‌دارد، AutoSSL را فعال می‌کند و نام کاربری/رمز/کلید اولیه را چاپ می‌کند. برای بروزرسانی همین دستور را دوباره اجرا کنید (دیتابیس حفظ می‌شود).
+
+> آپلود دستی: `relay.py` (مجوز 755)، `.htaccess` و پوشهٔ `gozar/` را در ریشهٔ سابدامین بگذارید، سپس با SSH دستور `python3 relay.py init` را اجرا کنید.
+
+### ۳. اجرای دستی / توسعه
+
+```bash
+python3 relay.py init                 # ساخت مدیر، سرویس‌های پیش‌فرض و اولین کلید
+python3 relay.py serve --port 8080    # پنل: http://localhost:8080
+python3 -m unittest discover -s tests # تست‌ها
+```
 
 ---
 
-## ۲. نصب روی هاست cPanel (روی هر سابدامنه یا پوشه)
+## اتصال برنامه‌ها
 
-اگر سرور اشتراکی cPanel با وب‌سرور LiteSpeed یا Apache دارید:
-1. در پنل cPanel وارد مسیر سابدامنه مورد نظر یا یک پوشه دلخواه (مثلاً `public_html/Relay`) شوید.
-2. این ۳ فایل را در آن پوشه آپلود کنید:
-   - `relay.py` (پرمیشن `0755`)
-   - `.htaccess` (پرمیشن `0644`)
-   - `config.json` (پرمیشن `0600`)
-3. رله فوراً فعال شده و آماده اتصال است.
-
----
-
-## ۳. اتصال ربات‌ها در سرور ایران
-
-تنها کاری که در کدهای ربات خود روی سرور ایران باید انجام دهید، تغییر آدرس پایه به آدرس رله و اضافه کردن کد اختصاصی ربات است:
+دو شکل آدرس (هر دو معادل‌اند):
 
 ```
-https://YOUR_DOMAIN/<BOT_KEY>/bot<BOT_TOKEN>/<METHOD>
+https://relay.telo.ir/<ACCESS_KEY>/<service>/<path>          # کلید داخل آدرس
+https://relay.telo.ir/<service>/<path>   +  X-Relay-Key: <ACCESS_KEY>
 ```
 
-### نمونه کد با `requests` (پایتون)
+هر چیزی بعد از `<service>` عیناً به آدرس مقصد سرویس اضافه می‌شود. کدهای آماده برای هر کلید در پنل (بخش «راهنمای اتصال») ساخته می‌شوند.
+
+### تلگرام
+
 ```python
-import requests
+# requests
+API = f"https://relay.telo.ir/{RELAY_KEY}/telegram/bot{BOT_TOKEN}"
+requests.post(f"{API}/sendMessage", json={"chat_id": 123, "text": "سلام"})
 
-BOT_TOKEN = "123456789:AAFakeTokenExample"
-RELAY_KEY = "key_8a2f4e19b0"  # کلید اختصاصی دریافت شده از پنل
-BASE_URL = f"https://your-domain.com/{RELAY_KEY}/bot{BOT_TOKEN}"
+# python-telegram-bot v20+
+app = (ApplicationBuilder().token(BOT_TOKEN)
+       .base_url(f"https://relay.telo.ir/{RELAY_KEY}/telegram/bot")
+       .base_file_url(f"https://relay.telo.ir/{RELAY_KEY}/telegram/file/bot").build())
 
-# دریافت آپدیت‌ها (Long Polling)
-updates = requests.get(f"{BASE_URL}/getUpdates", params={"timeout": 30}).json()
-
-# ارسال پیام
-requests.post(f"{BASE_URL}/sendMessage", json={
-    "chat_id": 12345678,
-    "text": "پیام از سرور ایران از طریق رله اختصاصی"
-})
+# aiogram 3
+session = AiohttpSession(api=TelegramAPIServer.from_base(f"https://relay.telo.ir/{RELAY_KEY}/telegram"))
 ```
 
-### نمونه کد با `telebot` (`pyTelegramBotAPI`)
+### OpenRouter (یا OpenAI / Groq)
+
 ```python
-import telebot
+from openai import OpenAI
 
-BOT_TOKEN = "123456789:AAFakeTokenExample"
-RELAY_KEY = "key_8a2f4e19b0"
-SERVER = "https://your-domain.com"
+# کلید OpenRouter در پنل ذخیره شده (مدیریت‌شده): کلید رله را به جای api_key بدهید
+client = OpenAI(base_url="https://relay.telo.ir/openrouter/api/v1", api_key=RELAY_KEY)
 
-telebot.apihelper.API_URL = f"{SERVER}/{RELAY_KEY}/bot{{0}}/{{1}}"
-telebot.apihelper.FILE_URL = f"{SERVER}/{RELAY_KEY}/file/bot{{0}}/{{1}}"
-
-bot = telebot.TeleBot(BOT_TOKEN)
-
-@bot.message_handler(commands=['start'])
-def on_start(msg):
-    bot.reply_to(msg, "سلام! ارتباط برقرار است.")
-
-bot.infinity_polling()
+# حالت عبوری: کلید رله در آدرس، کلید OpenRouter خودتان در api_key
+client = OpenAI(base_url=f"https://relay.telo.ir/{RELAY_KEY}/openrouter/api/v1", api_key="sk-or-...")
 ```
 
-### نمونه کد با `python-telegram-bot` (v20+)
+### Gemini
+
 ```python
-from telegram.ext import ApplicationBuilder
+from google import genai
+from google.genai import types
 
-BOT_TOKEN = "123456789:AAFakeTokenExample"
-RELAY_KEY = "key_8a2f4e19b0"
-SERVER = "https://your-domain.com"
-
-app = (
-    ApplicationBuilder()
-    .token(BOT_TOKEN)
-    .base_url(f"{SERVER}/{RELAY_KEY}/bot")
-    .base_file_url(f"{SERVER}/{RELAY_KEY}/file/bot")
-    .build()
-)
-
-app.run_polling()
+client = genai.Client(api_key=RELAY_KEY,   # یا کلید Gemini خودتان در حالت عبوری
+                      http_options=types.HttpOptions(base_url="https://relay.telo.ir/gemini"))
+print(client.models.generate_content(model="gemini-2.5-flash", contents="سلام").text)
 ```
 
-### نمونه کد با `aiogram` (v3)
-```python
-from aiogram import Bot, Dispatcher
-from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.client.telegram import TelegramAPIServer
+### هر API دیگر
 
-RELAY_KEY = "key_8a2f4e19b0"
-session = AiohttpSession(
-    api=TelegramAPIServer.from_base(f"https://your-domain.com/{RELAY_KEY}")
-)
-
-bot = Bot(token="YOUR_BOT_TOKEN", session=session)
-dp = Dispatcher()
-```
-
----
-
-## ۴. مدیریت سرویس در لینوکس
+در پنل «افزودن سرویس» → «سرویس سفارشی» را بزنید، شناسه (مثلاً `myapi`) و آدرس مقصد را وارد کنید:
 
 ```bash
-# بررسی وضعیت سرویس
-systemctl status telegram-relay
-
-# ریستارت کردن سرویس
-systemctl restart telegram-relay
-
-# متوقف کردن سرویس
-systemctl stop telegram-relay
-
-# مشاهده لاگ زنده اتصالات
-journalctl -u telegram-relay -f
+curl https://relay.telo.ir/myapi/v1/items -H "X-Relay-Key: gz_xxx"
 ```
+
+نمونه‌های کامل در پوشهٔ [`examples/`](examples).
 
 ---
 
-<a name="english-documentation"></a>
-# English Documentation
+## ساختار پروژه
 
-A lightweight, zero-dependency Telegram Bot API reverse proxy (relay) designed to bypass network restrictions and filtering. Includes a password-protected web dashboard, dynamic SVG captcha, and per-bot API key access control.
-
-### Architecture
 ```
-Bot Client (Iran / Filtered Server)
-           │
-           ▼  HTTPS Request (with bot key)
-Telegram Relay Server (Unfiltered VPS or cPanel)
-           │
-           ▼  Forwarding Request
-https://api.telegram.org
+relay.py                 نقطهٔ ورود (CGI یا CLI)
+gozar/
+├── app.py               مسیریابی اصلی
+├── proxy.py             موتور رله: تشخیص سرویس و کلید، سیاست‌ها، استریم به مقصد
+├── store.py             ذخیره‌سازی SQLite (تنظیمات، سرویس‌ها، کلیدها، لاگ)
+├── security.py          هش رمز، نشست امضاشده، کپچا، پنهان‌سازی توکن‌ها
+├── presets.py           قالب سرویس‌های آماده
+├── http.py              Request / Response مستقل از سرور
+├── runners.py           اجراکنندهٔ CGI و سرور مستقل چندنخی (HTTP/HTTPS)
+├── cli.py               دستورات مدیریتی
+└── panel/               پنل مدیریت (API + رابط کاربری تک‌صفحه‌ای بدون build)
+deploy/cpanel_deploy.py  استقرار خودکار روی cPanel
+install.sh               نصب‌کنندهٔ یک‌خطی VPS
+tests/                   تست‌های end-to-end
 ```
 
-### Highlights
-- **1-Command VPS Setup:** Installs Python 3, sets up `systemd`, configures firewall rules, and starts the service automatically.
-- **Zero Third-Party Dependencies:** Built entirely with Python's standard library (`urllib`, `http.server`, `hmac`, `hashlib`, `ssl`).
-- **Dual-Mode Engine:** Runs as a standalone multi-threaded HTTP server on Linux VPS or as a CGI script under cPanel / LiteSpeed / Apache.
-- **Dynamic Host & Path Detection:** Automatically detects protocol (`http`/`https`), domain, subdomain, and URI path prefix.
-- **Per-Bot Access Control:** Prevents unauthorized relay usage by requiring unique secret keys per bot.
-- **Web Admin Dashboard:** Master switch (kill switch), live Telegram connection status check, bot key manager, and password updates.
-- **SVG Captcha:** Fully client-side vector captcha without external imaging dependencies like Pillow.
-- **Long-Polling & Multipart Support:** Fully transparent forwarding for `getUpdates` (timeout-safe) and file/media binary streaming.
+## نکات امنیتی
+
+- هر برنامه/ربات کلید جدا داشته باشد تا در صورت نشت، فقط همان را قطع کنید.
+- برای سرویس‌های هوش مصنوعی حالت «مدیریت‌شده» را ترجیح دهید تا کلید اصلی فقط روی رله باشد.
+- رله IP، کوکی و هدرهای `X-Forwarded-*` کاربر را به مقصد نمی‌فرستد.
+- رمزها با PBKDF2-SHA256 (۲۰۰ هزار دور) ذخیره می‌شوند؛ تغییر رمز همهٔ نشست‌های قبلی را باطل می‌کند.
 
 ---
 
-## 1. Quick Installation (Linux VPS)
+<a name="english"></a>
 
-Run the following command as `root` on any fresh Ubuntu, Debian, CentOS, or AlmaLinux server:
+## English
+
+**Gozar** is a zero-dependency, self-hosted API relay for servers on restricted networks. Deploy it on an unrestricted VPS or cPanel host and point your apps at it instead of `api.telegram.org`, `openrouter.ai`, `generativelanguage.googleapis.com` or any other HTTP API.
+
+**Highlights**
+
+- Unlimited services, each mounted at `/<slug>` with presets for Telegram, OpenRouter, Gemini, OpenAI, Anthropic, Groq and GitHub, plus custom upstreams.
+- Per-app access keys with service allow-lists, per-minute rate limits, expiry dates and usage stats.
+- *Managed* upstream credentials: store provider keys on the relay (with random rotation across several keys); clients authenticate with their Gozar key, which the relay swaps for the real one.
+- Works with stock SDKs — only the base URL changes. Streaming (SSE), long polling and file transfer are passed through untouched.
+- Persian RTL admin panel: traffic dashboard, upstream health, service & key management, request log and generated connection snippets.
+- Captcha + lockout on login, signed sessions, CSRF protection, client IP/cookie stripping, bot-token redaction in logs.
+- Runs as a standalone threaded HTTP/HTTPS server (systemd, Let's Encrypt) or as CGI on Apache/LiteSpeed.
+- Backwards compatible with v1 URLs (`/<KEY>/bot<TOKEN>/<method>`) and auto-migrates v1 `config.json`.
+
+**URL scheme**
+
+```
+https://relay.example.com/<ACCESS_KEY>/<service>/<upstream path>
+https://relay.example.com/<service>/<upstream path>     (key via X-Relay-Key, Bearer token, or the service's own auth header)
+```
+
+**Install**
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
+# VPS
+bash <(curl -fsSL https://raw.githubusercontent.com/Danaserver/gozar-relay/main/install.sh)
+
+# cPanel
+CPANEL_TOKEN=... python3 deploy/cpanel_deploy.py --host HOST --user USER --domain relay.example.com
+
+# Local
+python3 relay.py init && python3 relay.py serve --port 8080
 ```
-
-### Custom Ports & Co-existence with Existing Services (Nginx / Apache / X-UI):
-The installer automatically detects whether ports 80 and 443 are already bound by existing services. If occupied, it warns you and suggests safe alternatives (such as `8080` and `8443`).
-
-You can also explicitly pass custom HTTP and HTTPS ports via environment variables or CLI arguments:
-```bash
-# Pass custom HTTP & HTTPS ports:
-PORT=8080 SSL_PORT=8443 curl -sSL https://raw.githubusercontent.com/Danaserver/telegram-relay/main/install.sh | bash
-
-# Or when running the script directly:
-sudo bash install.sh 8080 8443 relay.yourdomain.com
-```
-
-> **Cloudflare Note:** When proxying behind Cloudflare, supported HTTPS ports are `443, 8443, 2053, 2083, 2087, 2096` and HTTP ports are `80, 8080, 8880`.
-
-#### Nginx Reverse Proxy Example (Optional):
-If Nginx is already bound to ports 80 and 443, run Telegram Relay on an internal port (e.g. `8080`) and forward requests from your domain:
-```nginx
-server {
-    listen 80;
-    server_name relay.yourdomain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
----
-
-## 2. Shared Hosting / cPanel Setup
-
-1. Create a subdomain or subfolder in your hosting panel (e.g. `public_html/Relay`).
-2. Upload the following files:
-   - `relay.py` (chmod `0755`)
-   - `.htaccess` (chmod `0644`)
-   - `config.json` (chmod `0600`)
-3. Access the URL in your browser to log in to the management dashboard.
-
----
-
-## 3. Usage & Routing Format
-
-Requests are routed using the bot's secret key:
-```
-https://YOUR_DOMAIN/<BOT_KEY>/bot<TOKEN>/<METHOD>
-```
-Alternative authentication methods supported:
-- Query parameter: `?relay_key=<BOT_KEY>`
-- HTTP Header: `X-Relay-Key: <BOT_KEY>`
-
----
-
-## 4. Service Commands (Systemd)
-
-```bash
-systemctl status telegram-relay    # Check service status
-systemctl restart telegram-relay   # Restart service
-systemctl stop telegram-relay      # Stop service
-journalctl -u telegram-relay -f    # Live logs
-```
-
----
-
-## Security Model
-- Admin passwords are encrypted using `PBKDF2-HMAC-SHA256` with random 16-byte cryptographic salts.
-- Sessions are protected via HMAC-SHA256 cryptographically signed tokens.
-- Direct web access to `config.json` is denied via `.htaccess`.
-- Bot requests without a registered and enabled key are rejected with `403 Forbidden`.
 
 ## License
-Distributed under the [MIT License](LICENSE).
+
+[MIT](LICENSE)

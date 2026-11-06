@@ -1,27 +1,28 @@
-# Sensitive files
+# Runtime data (database, bootstrap, TLS) — never commit
+data/
+*.db
+*.db-journal
+bootstrap.json
 config.json
 *.key
 *.pem
 *.crt
 
-# Deployment scripts with credentials
+# Local deploy helpers that may hold credentials
 deploy_relay.py
+deploy/*.local.*
+.env
 
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
 .venv/
-env/
 venv/
 
-# Archives & Logs
-*.zip
+# Misc
 *.log
 *.pid
-.system_generated/
-
-# OS files
+*.zip
 .DS_Store
 Thumbs.db
+.claude/

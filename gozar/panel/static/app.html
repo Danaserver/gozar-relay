@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Gozar Relay — پنل مدیریت</title>
+  <link rel="stylesheet" href="{{base}}/_panel/static/app.css?v={{version}}">
+  <link rel="icon" href="{{base}}/_panel/static/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <div id="app"><div class="loading-screen"><span class="spinner"></span></div></div>
+  <div class="toasts" id="toasts"></div>
+  <script>window.GOZAR = { base: "{{base}}", csrf: "{{csrf}}", version: "{{version}}" };</script>
+  <script src="{{base}}/_panel/static/app.js?v={{version}}"></script>
+</body>
+</html>
