@@ -133,6 +133,9 @@ def main():
     ap.add_argument("--no-subdomain", action="store_true", help="do not try to create the subdomain")
     args = ap.parse_args()
 
+    if ":" in args.python or "\\" in args.python:
+        sys.exit("--python looks like a Windows path ({}). In Git Bash run with MSYS_NO_PATHCONV=1."
+                 .format(args.python))
     token = os.environ.get("CPANEL_TOKEN")
     if not token:
         sys.exit("Set CPANEL_TOKEN in the environment.")
@@ -221,6 +224,8 @@ def main():
 
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     t0 = time.time()
     try:
         main()
