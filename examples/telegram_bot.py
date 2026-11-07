@@ -3,7 +3,7 @@ Minimal long-polling Telegram bot that runs on a server inside Iran and talks
 to Telegram through Gozar. Needs only `requests`.
 
     pip install requests
-    RELAY=https://relay.telo.ir RELAY_KEY=gz_xxx BOT_TOKEN=123:ABC python telegram_bot.py
+    RELAY=https://relay.tello.ir RELAY_KEY=gz_xxx BOT_TOKEN=123:ABC python telegram_bot.py
 """
 
 import os
@@ -11,7 +11,7 @@ import time
 
 import requests
 
-RELAY = os.environ.get("RELAY", "https://relay.telo.ir")
+RELAY = os.environ.get("RELAY", "https://relay.tello.ir")
 RELAY_KEY = os.environ["RELAY_KEY"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 API = "{}/{}/telegram/bot{}".format(RELAY, RELAY_KEY, BOT_TOKEN)

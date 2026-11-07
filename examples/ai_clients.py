@@ -6,12 +6,12 @@ the api_key — the real provider key never leaves the relay. Otherwise
 (passthrough mode) put the access key in the URL and use your own provider key.
 
     pip install openai google-genai
-    RELAY=https://relay.telo.ir RELAY_KEY=gz_xxx python ai_clients.py
+    RELAY=https://relay.tello.ir RELAY_KEY=gz_xxx python ai_clients.py
 """
 
 import os
 
-RELAY = os.environ.get("RELAY", "https://relay.telo.ir")
+RELAY = os.environ.get("RELAY", "https://relay.tello.ir")
 RELAY_KEY = os.environ["RELAY_KEY"]
 
 

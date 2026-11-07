@@ -26,7 +26,7 @@ Telegram · OpenRouter · Gemini · OpenAI · Claude · Groq · GitHub · هر A
 
 ```
  سرور ایران (ربات / وب‌سایت / حامی‌کار)
-            │  https://relay.telo.ir/<KEY>/<service>/...
+            │  https://relay.tello.ir/<KEY>/<service>/...
             ▼
  ┌──────────────────────────┐
  │        Gozar Relay       │  کلید دسترسی · محدودیت نرخ · لاگ · کلید API مدیریت‌شده
@@ -79,17 +79,17 @@ gozar key add --name "ربات فروش" --services telegram
 gozar uninstall
 ```
 
-### ۲. روی هاست cPanel (مثلاً `relay.telo.ir`)
+### ۲. روی هاست cPanel (مثلاً `relay.example.com`)
 
 یک API Token در cPanel بسازید (Security » Manage API Tokens) و روی کامپیوتر خودتان اجرا کنید:
 
 ```bash
 export CPANEL_TOKEN=xxxxxxxxxxxx
-python3 deploy/cpanel_deploy.py --host my-cpanel-host.com --user cpuser --domain relay.telo.ir \
+python3 deploy/cpanel_deploy.py --host my-cpanel-host.com --user cpuser --domain relay.example.com \
     --python /opt/alt/python311/bin/python3
 ```
 
-اسکریپت سابدامین را می‌سازد، فایل‌ها را آپلود می‌کند، دیتابیس را **بیرون از پوشهٔ وب** (`~/.gozar/relay.telo.ir`) نگه می‌دارد، AutoSSL را فعال می‌کند و نام کاربری/رمز/کلید اولیه را چاپ می‌کند. برای بروزرسانی همین دستور را دوباره اجرا کنید (دیتابیس حفظ می‌شود).
+اسکریپت سابدامین را می‌سازد، فایل‌ها را آپلود می‌کند، دیتابیس را **بیرون از پوشهٔ وب** (`~/.gozar/relay.tello.ir`) نگه می‌دارد، AutoSSL را فعال می‌کند و نام کاربری/رمز/کلید اولیه را چاپ می‌کند. برای بروزرسانی همین دستور را دوباره اجرا کنید (دیتابیس حفظ می‌شود).
 
 > آپلود دستی: `relay.py` (مجوز 755)، `.htaccess` و پوشهٔ `gozar/` را در ریشهٔ سابدامین بگذارید، سپس با SSH دستور `python3 relay.py init` را اجرا کنید.
 
@@ -108,8 +108,8 @@ python3 -m unittest discover -s tests # تست‌ها
 دو شکل آدرس (هر دو معادل‌اند):
 
 ```
-https://relay.telo.ir/<ACCESS_KEY>/<service>/<path>          # کلید داخل آدرس
-https://relay.telo.ir/<service>/<path>   +  X-Relay-Key: <ACCESS_KEY>
+https://relay.tello.ir/<ACCESS_KEY>/<service>/<path>          # کلید داخل آدرس
+https://relay.tello.ir/<service>/<path>   +  X-Relay-Key: <ACCESS_KEY>
 ```
 
 هر چیزی بعد از `<service>` عیناً به آدرس مقصد سرویس اضافه می‌شود. کدهای آماده برای هر کلید در پنل (بخش «راهنمای اتصال») ساخته می‌شوند.
@@ -118,16 +118,16 @@ https://relay.telo.ir/<service>/<path>   +  X-Relay-Key: <ACCESS_KEY>
 
 ```python
 # requests
-API = f"https://relay.telo.ir/{RELAY_KEY}/telegram/bot{BOT_TOKEN}"
+API = f"https://relay.tello.ir/{RELAY_KEY}/telegram/bot{BOT_TOKEN}"
 requests.post(f"{API}/sendMessage", json={"chat_id": 123, "text": "سلام"})
 
 # python-telegram-bot v20+
 app = (ApplicationBuilder().token(BOT_TOKEN)
-       .base_url(f"https://relay.telo.ir/{RELAY_KEY}/telegram/bot")
-       .base_file_url(f"https://relay.telo.ir/{RELAY_KEY}/telegram/file/bot").build())
+       .base_url(f"https://relay.tello.ir/{RELAY_KEY}/telegram/bot")
+       .base_file_url(f"https://relay.tello.ir/{RELAY_KEY}/telegram/file/bot").build())
 
 # aiogram 3
-session = AiohttpSession(api=TelegramAPIServer.from_base(f"https://relay.telo.ir/{RELAY_KEY}/telegram"))
+session = AiohttpSession(api=TelegramAPIServer.from_base(f"https://relay.tello.ir/{RELAY_KEY}/telegram"))
 ```
 
 ### OpenRouter (یا OpenAI / Groq)
@@ -136,10 +136,10 @@ session = AiohttpSession(api=TelegramAPIServer.from_base(f"https://relay.telo.ir
 from openai import OpenAI
 
 # کلید OpenRouter در پنل ذخیره شده (مدیریت‌شده): کلید رله را به جای api_key بدهید
-client = OpenAI(base_url="https://relay.telo.ir/openrouter/api/v1", api_key=RELAY_KEY)
+client = OpenAI(base_url="https://relay.tello.ir/openrouter/api/v1", api_key=RELAY_KEY)
 
 # حالت عبوری: کلید رله در آدرس، کلید OpenRouter خودتان در api_key
-client = OpenAI(base_url=f"https://relay.telo.ir/{RELAY_KEY}/openrouter/api/v1", api_key="sk-or-...")
+client = OpenAI(base_url=f"https://relay.tello.ir/{RELAY_KEY}/openrouter/api/v1", api_key="sk-or-...")
 ```
 
 ### Gemini
@@ -149,7 +149,7 @@ from google import genai
 from google.genai import types
 
 client = genai.Client(api_key=RELAY_KEY,   # یا کلید Gemini خودتان در حالت عبوری
-                      http_options=types.HttpOptions(base_url="https://relay.telo.ir/gemini"))
+                      http_options=types.HttpOptions(base_url="https://relay.tello.ir/gemini"))
 print(client.models.generate_content(model="gemini-2.5-flash", contents="سلام").text)
 ```
 
@@ -158,7 +158,7 @@ print(client.models.generate_content(model="gemini-2.5-flash", contents="سلا�
 در پنل «افزودن سرویس» → «سرویس سفارشی» را بزنید، شناسه (مثلاً `myapi`) و آدرس مقصد را وارد کنید:
 
 ```bash
-curl https://relay.telo.ir/myapi/v1/items -H "X-Relay-Key: gz_xxx"
+curl https://relay.tello.ir/myapi/v1/items -H "X-Relay-Key: gz_xxx"
 ```
 
 نمونه‌های کامل در پوشهٔ [`examples/`](examples) · راهنمای اتصال حامی‌کار: [`docs/HAMICAR.md`](docs/HAMICAR.md)
@@ -168,7 +168,7 @@ curl https://relay.telo.ir/myapi/v1/items -H "X-Relay-Key: gz_xxx"
 برنامه‌هایی که آدرس را به شکل `<relay>/<host>/<path>` می‌سازند و کلید را با هدر `X-Relay-Key` می‌فرستند (مثل حامی‌کار) بدون تغییر کار می‌کنند. فقط hostهایی که به عنوان سرویس تعریف شده‌اند عبور داده می‌شوند:
 
 ```bash
-curl https://relay.telo.ir/openrouter.ai/api/v1/models -H "X-Relay-Key: gz_xxx"
+curl https://relay.tello.ir/openrouter.ai/api/v1/models -H "X-Relay-Key: gz_xxx"
 ```
 
 ### متغیرها، هدرها و پارامترهای اختصاصی
