@@ -80,19 +80,51 @@ def run_cgi():
 
 # ----------------------------------------------------------------- standalone
 
+HANDSHAKE_TIMEOUT = 15
+
+
 class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
     allow_reuse_address = True
-    request_queue_size = 128
+    request_queue_size = 256
     is_ssl = False
     base_path = ""
+    ssl_context = None
+
+    def finish_request(self, request, client_address):
+        # The TLS handshake runs here, in the per-connection thread, never in the
+        # accept loop: a client that connects and stalls (scanners, DPI middleboxes)
+        # must not block everyone else.
+        if self.ssl_context is not None:
+            try:
+                request.settimeout(HANDSHAKE_TIMEOUT)
+                request = self.ssl_context.wrap_socket(request, server_side=True)
+            except (OSError, ssl.SSLError):
+                try:
+                    request.close()
+                except OSError:
+                    pass
+                return
+        try:
+            super().finish_request(request, client_address)
+        finally:
+            try:
+                request.close()
+            except OSError:
+                pass
+
+    def handle_error(self, request, client_address):
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionError, TimeoutError, ssl.SSLError, OSError)):
+            return  # disconnects and timeouts are routine for a public relay
+        super().handle_error(request, client_address)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "Gozar/" + __version__
     sys_version = ""
-    timeout = 330
+    timeout = 75  # idle keep-alive / slow request read; upstream waits are not affected
 
     def _handle(self):
         length = self.headers.get("Content-Length", "")
@@ -162,7 +194,7 @@ def _https_server(host, port, cert, key, base_path):
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.load_cert_chain(cert, key)
-    srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+    srv.ssl_context = ctx
     srv.is_ssl = True
     srv.base_path = base_path
     return srv

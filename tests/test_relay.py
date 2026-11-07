@@ -394,6 +394,43 @@ class CgiAndMigrationTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TlsListenerTests(unittest.TestCase):
+    """A client that connects and never handshakes must not block other HTTPS clients."""
+
+    def test_stalled_handshake_does_not_block(self):
+        import socket
+        import ssl
+        import subprocess
+        from gozar.runners import _https_server
+        tmp = tempfile.mkdtemp(prefix="gozar-tls-")
+        cert, key = os.path.join(tmp, "c.pem"), os.path.join(tmp, "k.pem")
+        try:
+            subprocess.run(["openssl", "req", "-x509", "-nodes", "-days", "1", "-newkey", "rsa:2048",
+                            "-keyout", key, "-out", cert, "-subj", "/CN=localhost"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            shutil.rmtree(tmp, ignore_errors=True)
+            self.skipTest("openssl not available")
+        srv = _https_server("127.0.0.1", 0, cert, key, "")
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        port = srv.server_address[1]
+        stalled = socket.create_connection(("127.0.0.1", port))
+        try:
+            time.sleep(0.2)
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            started = time.time()
+            with urllib.request.urlopen("https://127.0.0.1:{}/_health".format(port), timeout=5, context=ctx) as r:
+                self.assertEqual(r.status, 200)
+            self.assertLess(time.time() - started, 4)
+        finally:
+            stalled.close()
+            srv.shutdown()
+            srv.server_close()
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class VariablesTests(unittest.TestCase):
     def test_parse_and_mask(self):
         from gozar import variables as V
