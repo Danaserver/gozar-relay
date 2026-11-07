@@ -159,7 +159,11 @@ if [ -z "$SSL_PORT" ]; then
 fi
 PORT=$((PORT + 0)); SSL_PORT=$((SSL_PORT + 0))
 [ "$PORT" -gt 0 ] || [ "$SSL_PORT" -gt 0 ] || die "At least one port must be enabled"
-for p in $PORT $SSL_PORT; do [ "$p" -gt 0 ] && port_busy "$p" && die "port $p is already in use"; done
+for p in $PORT $SSL_PORT; do
+  [ "$p" -gt 0 ] || continue
+  for _ in $(seq 1 20); do port_busy "$p" || break; sleep 1; done  # let the old process release it
+  port_busy "$p" && die "port $p is already in use"
+done
 ok "HTTP: $([ $PORT -gt 0 ] && echo $PORT || echo off)   HTTPS: $([ $SSL_PORT -gt 0 ] && echo $SSL_PORT || echo off)"
 
 # ----------------------------------------------------------------------- TLS
