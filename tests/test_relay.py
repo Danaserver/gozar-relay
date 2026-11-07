@@ -313,6 +313,49 @@ class CgiAndMigrationTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_cgi_buffers_streamed_body(self):
+        import io
+        from unittest import mock
+        from gozar import runners
+        from gozar.http import Response
+
+        class Out(io.BytesIO):
+            writes = 0
+
+            def write(self, b):
+                Out.writes += 1
+                return super().write(b)
+
+        def stream():
+            yield b'{"data": ['
+            yield b'"a", "b"'
+            yield b']}'
+
+        cases = [
+            (Response(200, [("Content-Type", "application/json")], stream()), True),
+            (Response(200, [("Content-Type", "text/event-stream")], iter([b"data: 1\n\n", b"data: 2\n\n"])), False),
+        ]
+        for resp, buffered in cases:
+            out = Out()
+            Out.writes = 0
+            fake_stdout = mock.Mock(buffer=out)
+            fake_stdin = mock.Mock(buffer=io.BytesIO())
+            env = {"REQUEST_METHOD": "GET", "REQUEST_URI": "/x", "SCRIPT_NAME": "/relay.py"}
+            with mock.patch.object(runners, "dispatch", return_value=resp), \
+                    mock.patch.object(runners.sys, "stdout", fake_stdout), \
+                    mock.patch.object(runners.sys, "stdin", fake_stdin), \
+                    mock.patch.dict(runners.os.environ, env, clear=True):
+                runners.run_cgi()
+            raw = out.getvalue()
+            if buffered:
+                self.assertEqual(Out.writes, 1)
+                self.assertIn(b"Content-Length: 20\r\n", raw)
+                self.assertTrue(raw.endswith(b'{"data": ["a", "b"]}'))
+            else:
+                self.assertGreater(Out.writes, 1)
+                self.assertNotIn(b"Content-Length", raw)
+                self.assertTrue(raw.endswith(b"data: 2\n\n"))
+
     def test_legacy_import(self):
         from gozar.store import Store
         tmp = tempfile.mkdtemp(prefix="gozar-legacy-")

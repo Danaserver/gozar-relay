@@ -45,15 +45,33 @@ def run_cgi():
                   base_path=env.get("GOZAR_BASE_PATH", base_path))
     resp = dispatch(req)
 
+    # LiteSpeed/Apache CGI on shared hosts can stall a response that is written in several
+    # pieces. Anything that is not an event stream is read in full and written once.
+    is_sse = "text/event-stream" in (resp.headers.get("Content-Type") or "").lower()
+    buffered = None
+    if resp.streaming and not is_sse and req.method != "HEAD":
+        try:
+            buffered = b"".join(resp.iter_body())
+        except Exception:
+            buffered = b""
+        del resp.headers["Transfer-Encoding"]
+        resp.headers["Content-Length"] = str(len(buffered))
+
     lines = ["Status: {} {}".format(resp.status, REASONS.get(resp.status, "OK"))]
     lines += ["{}: {}".format(k, v) for k, v in resp.header_list()]
+    head = ("\r\n".join(lines) + "\r\n\r\n").encode("latin-1", "replace")
     try:
-        stdout.write(("\r\n".join(lines) + "\r\n\r\n").encode("latin-1", "replace"))
-        stdout.flush()
-        if req.method != "HEAD":
+        if req.method == "HEAD":
+            stdout.write(head)
+        elif buffered is not None:
+            stdout.write(head + buffered)
+        else:
+            stdout.write(head)
+            stdout.flush()
             for chunk in resp.iter_body():
                 stdout.write(chunk)
                 stdout.flush()
+        stdout.flush()
     except (BrokenPipeError, ConnectionResetError):
         pass
     finally:
