@@ -132,6 +132,7 @@ ok "Gozar v${VERSION}"
 port_busy() { "$PY" - "$1" <<'EOF' 2>/dev/null
 import socket, sys
 s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # ignore TIME_WAIT/FIN_WAIT leftovers
 try:
     s.bind(("0.0.0.0", int(sys.argv[1]))); sys.exit(1)
 except OSError:
