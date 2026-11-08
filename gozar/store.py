@@ -326,7 +326,7 @@ class Store:
         self.db.execute("DELETE FROM request_log WHERE id <= (SELECT MAX(id) FROM request_log) - ?", (keep,))
         self.db.execute("DELETE FROM login_attempts WHERE ts < ?", (time.time() - 86400,))
 
-    def recent_logs(self, limit=100, service=None, key_id=None, errors_only=False):
+    def recent_logs(self, limit=100, service=None, key_id=None, errors_only=False, hide_unknown=False):
         sql = ("SELECT l.*, k.name AS key_name FROM request_log l"
                " LEFT JOIN access_keys k ON k.id = l.key_id WHERE 1 = 1")
         args = []
@@ -336,11 +336,18 @@ class Store:
         if key_id:
             sql += " AND l.key_id = ?"
             args.append(key_id)
+        if hide_unknown:
+            sql += " AND NOT (l.key_id IS NULL AND l.service IS NULL)"
         if errors_only:
             sql += " AND (l.status >= 400 OR l.status IS NULL)"
         sql += " ORDER BY l.id DESC LIMIT ?"
         args.append(min(int(limit), 500))
         return [_row(r) for r in self.db.execute(sql, args)]
+
+    def clear_unknown_logs(self):
+        """Delete requests that matched no service and no key (internet scanners)."""
+        cur = self.db.execute("DELETE FROM request_log WHERE key_id IS NULL AND service IS NULL")
+        return cur.rowcount
 
     def clear_logs(self):
         self.db.execute("DELETE FROM request_log")

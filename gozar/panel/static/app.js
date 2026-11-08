@@ -3,7 +3,7 @@
   'use strict';
 
   var G = window.GOZAR;
-  var S = { state: null, view: (location.hash || '#overview').slice(1), logs: [], logFilter: { service: '', key_id: '', errors: false } };
+  var S = { state: null, view: (location.hash || '#overview').slice(1), logs: [], logFilter: { service: '', key_id: '', errors: false, unknown: false } };
 
   // ------------------------------------------------------------------ utils
   function esc(v) {
@@ -290,18 +290,19 @@
 
   function vLogs() {
     var st = S.state, f = S.logFilter;
-    $('#top-actions').innerHTML = '<button class="btn btn-sm" data-act="reload-logs">' + icon('refresh') + 'بروزرسانی</button><button class="btn btn-sm btn-danger" data-act="clear-logs">' + icon('trash') + 'پاک کردن</button>';
+    $('#top-actions').innerHTML = '<button class="btn btn-sm" data-act="reload-logs">' + icon('refresh') + 'بروزرسانی</button><button class="btn btn-sm btn-danger" data-act="clear-unknown">' + icon('trash') + 'حذف ناشناس‌ها</button><button class="btn btn-sm btn-danger" data-act="clear-logs">' + icon('trash') + 'پاک کردن</button>';
     $('#view').innerHTML = '<div class="card"><div class="row" style="margin-bottom:14px">' +
       '<select id="lf-service" style="width:auto"><option value="">همهٔ سرویس‌ها</option>' + st.services.map(function (s) { return '<option value="' + esc(s.slug) + '"' + (f.service === s.slug ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select>' +
       '<select id="lf-key" style="width:auto"><option value="">همهٔ کلیدها</option>' + st.keys.map(function (k) { return '<option value="' + k.id + '"' + (String(f.key_id) === String(k.id) ? ' selected' : '') + '>' + esc(k.name) + '</option>'; }).join('') + '</select>' +
-      '<label class="switch"><input type="checkbox" id="lf-err"' + (f.errors ? ' checked' : '') + '><span class="track"></span>فقط خطاها</label></div>' +
+      '<label class="switch"><input type="checkbox" id="lf-err"' + (f.errors ? ' checked' : '') + '><span class="track"></span>فقط خطاها</label>' +
+      '<label class="switch" title="درخواست‌هایی که نه کلید دارند نه سرویس (معمولاً ربات‌های اسکنر)"><input type="checkbox" id="lf-unknown"' + (f.unknown ? ' checked' : '') + '><span class="track"></span>نمایش ناشناس‌ها</label></div>' +
       '<div class="table-wrap"><table><thead><tr><th>زمان</th><th>سرویس</th><th>کلید</th><th>درخواست</th><th>وضعیت</th><th>زمان پاسخ</th><th>حجم</th><th>IP</th></tr></thead><tbody id="log-rows"><tr><td colspan="8" class="empty"><span class="spinner"></span></td></tr></tbody></table></div></div>';
     loadLogs();
   }
 
   function loadLogs() {
     var f = S.logFilter;
-    api('logs?service=' + encodeURIComponent(f.service) + '&key_id=' + encodeURIComponent(f.key_id) + '&errors=' + (f.errors ? 1 : 0)).then(function (r) {
+    api('logs?service=' + encodeURIComponent(f.service) + '&key_id=' + encodeURIComponent(f.key_id) + '&errors=' + (f.errors ? 1 : 0) + '&unknown=' + (f.unknown ? 1 : 0)).then(function (r) {
       var el = $('#log-rows');
       if (!el) return;
       el.innerHTML = r.logs.length ? r.logs.map(function (l) {
@@ -535,6 +536,11 @@
       });
     },
     'reload-logs': loadLogs,
+    'clear-unknown': function () {
+      confirmBox('گزارش درخواست‌های ناشناس (بدون کلید و بدون سرویس — معمولاً ربات‌های اسکنر) حذف شوند؟', function () {
+        api('logs/clear_unknown', {}).then(function (r) { toast(fa(r.deleted) + ' گزارش ناشناس حذف شد'); loadLogs(); load(); });
+      });
+    },
     'clear-logs': function () { confirmBox('همهٔ گزارش‌ها پاک شوند؟', function () { api('logs/clear', {}).then(function () { toast('پاک شد'); loadLogs(); load(); }); }); }
   };
 
@@ -558,6 +564,7 @@
     if (e.target.id === 'lf-service') { S.logFilter.service = e.target.value; loadLogs(); }
     if (e.target.id === 'lf-key') { S.logFilter.key_id = e.target.value; loadLogs(); }
     if (e.target.id === 'lf-err') { S.logFilter.errors = e.target.checked; loadLogs(); }
+    if (e.target.id === 'lf-unknown') { S.logFilter.unknown = e.target.checked; loadLogs(); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
   window.addEventListener('hashchange', function () {

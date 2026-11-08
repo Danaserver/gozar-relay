@@ -237,6 +237,18 @@ class RelayTests(unittest.TestCase):
         self.assertTrue(any("bot999:***" in p for p in paths))
         self.assertFalse(any("SECRETTOKEN" in p for p in paths))
 
+    def test_unknown_logs_hide_and_delete(self):
+        self.call("/.env")
+        self.call("/{}/telegram/bot1:X/getMe".format(self.key))
+        time.sleep(0.1)
+        st = self.store
+        self.assertTrue(any(l["path"] == "/.env" for l in st.recent_logs(50)))
+        self.assertFalse(any(l["path"] == "/.env" for l in st.recent_logs(50, hide_unknown=True)))
+        self.assertGreaterEqual(st.clear_unknown_logs(), 1)
+        rows = st.recent_logs(50)
+        self.assertFalse(any(l["key_id"] is None and l["service"] is None for l in rows))
+        self.assertTrue(any(l["service"] == "telegram" for l in rows))
+
     # --------------------------------------------------------------- panel
 
     def test_panel_login_flow(self):

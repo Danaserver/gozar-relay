@@ -217,8 +217,12 @@ def api(req, store, action):
         rows = store.recent_logs(limit=_int((p.get("limit") or [150])[0], 150, 1, 500),
                                  service=(p.get("service") or [None])[0] or None,
                                  key_id=_int((p.get("key_id") or [0])[0]) or None,
-                                 errors_only=(p.get("errors") or ["0"])[0] == "1")
+                                 errors_only=(p.get("errors") or ["0"])[0] == "1",
+                                 hide_unknown=(p.get("unknown") or ["1"])[0] == "0")
         return json_response({"logs": rows})
+
+    if action == "logs/clear_unknown":
+        return json_response({"deleted": store.clear_unknown_logs()})
 
     if action == "logs/clear":
         store.clear_logs()
