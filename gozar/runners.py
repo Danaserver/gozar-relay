@@ -78,8 +78,7 @@ def run_cgi():
         resp.close()
     try:  # CGI has no background threads: run a due automatic backup after replying
         from . import backup
-        from .store import get_store
-        backup.maybe_run(get_store())
+        backup.maybe_run()
     except Exception:
         pass
 

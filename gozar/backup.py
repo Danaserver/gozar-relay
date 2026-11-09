@@ -93,7 +93,10 @@ def due(store):
     return time.time() - int(store.get("backup_last_at") or 0) >= hours * 3600
 
 
-def maybe_run(store):
+def maybe_run(store=None):
+    if store is None:
+        from .store import get_store
+        store = get_store()
     if due(store):
         run(store, "auto")
 
