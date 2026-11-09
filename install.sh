@@ -12,6 +12,7 @@
 #    --self-signed                               skip Let's Encrypt, use a self-signed cert
 #    --listen 127.0.0.1           LISTEN=...     bind address (127.0.0.1 behind nginx/aaPanel)
 #    --restore backup.db.gz       RESTORE=...    restore a Gozar backup before starting
+#    --app-dir /path              GOZAR_APP_DIR  where the code lives (default /opt/gozar)
 #    --yes                                       non-interactive, accept defaults
 #    uninstall                                   remove Gozar (keeps the database)
 #
@@ -21,7 +22,7 @@ set -euo pipefail
 
 REPO="${GOZAR_REPO:-Danaserver/gozar-relay}"
 BRANCH="${GOZAR_BRANCH:-main}"
-APP_DIR="/opt/gozar"
+APP_DIR="${GOZAR_APP_DIR:-/opt/gozar}"
 DATA_DIR="/var/lib/gozar"
 SERVICE="gozar"
 BIN="/usr/local/bin/gozar"
@@ -39,6 +40,7 @@ while [ $# -gt 0 ]; do
     --self-signed) SELF_SIGNED=1 ;;
     --listen) LISTEN="$2"; shift ;;
     --restore) RESTORE="$2"; shift ;;
+    --app-dir) APP_DIR="${2%/}"; shift ;;
     -y|--yes) ASSUME_YES=1 ;;
     uninstall) ACTION="uninstall" ;;
     -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
@@ -243,7 +245,7 @@ case "\${1:-}" in
   stop)      systemctl stop ${SERVICE} ;;
   start)     systemctl start ${SERVICE} ;;
   logs)      journalctl -u ${SERVICE} -f -n 100 ;;
-  update)    bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh) --yes --port ${PORT} --ssl-port ${SSL_PORT} ${DOMAIN:+--domain $DOMAIN} ;;
+  update)    bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh) --yes --port ${PORT} --ssl-port ${SSL_PORT} --listen ${LISTEN} --app-dir ${APP_DIR} ${DOMAIN:+--domain $DOMAIN} ;;
   uninstall) bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh) uninstall ;;
   ""|-h|--help)
     echo "usage: gozar {status|restart|start|stop|logs|update|uninstall|info|reset-password|key ...}" ;;
@@ -269,9 +271,10 @@ ADMIN_PASS="$(echo "$INIT_JSON" | "$PY" -c 'import json,sys; print(json.load(sys
 FIRST_KEY="$(echo "$INIT_JSON" | "$PY" -c 'import json,sys; print(json.load(sys.stdin).get("key") or "")' 2>/dev/null || true)"
 rm -f "$APP_DIR/config.json"
 
-# Firewall
+# Firewall (nothing to open when only listening on localhost behind a local web server)
 for p in $PORT $SSL_PORT; do
   [ "$p" -gt 0 ] || continue
+  case "$LISTEN" in 127.*|localhost|::1) continue ;; esac
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow "$p/tcp" >/dev/null 2>&1 || true
   elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then firewall-cmd -q --permanent --add-port="$p/tcp" || true; fi
 done
