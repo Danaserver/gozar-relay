@@ -354,6 +354,7 @@ class CgiAndMigrationTests(unittest.TestCase):
             fake_stdin = mock.Mock(buffer=io.BytesIO())
             env = {"REQUEST_METHOD": "GET", "REQUEST_URI": "/x", "SCRIPT_NAME": "/relay.py"}
             with mock.patch.object(runners, "dispatch", return_value=resp), \
+                    mock.patch("gozar.backup.maybe_run"), \
                     mock.patch.object(runners.sys, "stdout", fake_stdout), \
                     mock.patch.object(runners.sys, "stdin", fake_stdin), \
                     mock.patch.dict(runners.os.environ, env, clear=True):
