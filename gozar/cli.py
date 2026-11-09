@@ -86,6 +86,29 @@ def cmd_info(args):
     return 0
 
 
+def cmd_backup(args):
+    from . import backup
+    st = get_store()
+    if args.send:
+        ok, msg = backup.run(st)
+        print(msg)
+        return 0 if ok else 1
+    name, data = backup.snapshot(st)
+    out = args.out or name
+    with open(out, "wb") as f:
+        f.write(data)
+    print(out)
+    return 0
+
+
+def cmd_restore(args):
+    from . import backup
+    keys, services = backup.restore(args.file)
+    print("restored: {} keys, {} services -> {}".format(keys, services, paths.db_path()))
+    print("restart the service to load it:  systemctl restart gozar")
+    return 0
+
+
 def cmd_bootstrap(args):
     """Write a bootstrap.json for hosts where commands cannot be run (cPanel)."""
     password = args.password or security.random_password()
@@ -141,6 +164,15 @@ def build_parser():
 
     s = sub.add_parser("info", help="show configuration summary")
     s.set_defaults(func=cmd_info)
+
+    s = sub.add_parser("backup", help="write a gzip snapshot of the database, or --send it to Telegram")
+    s.add_argument("--out", help="output file (default: gozar-<host>-<time>.db.gz)")
+    s.add_argument("--send", action="store_true", help="send to the Telegram chat configured in the panel")
+    s.set_defaults(func=cmd_backup)
+
+    s = sub.add_parser("restore", help="replace the database with a backup (.db or .db.gz)")
+    s.add_argument("file")
+    s.set_defaults(func=cmd_restore)
 
     s = sub.add_parser("bootstrap", help="write a bootstrap.json for cPanel deployments")
     s.add_argument("--out", required=True)

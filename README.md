@@ -187,6 +187,20 @@ curl https://relay.tello.ir/openrouter.ai/api/v1/models -H "X-Relay-Key: gz_xxx"
 
 ---
 
+## بکاپ و بازگردانی
+
+- **بکاپ خودکار به تلگرام:** در پنل ← تنظیمات ← «پشتیبان‌گیری خودکار»، توکن یک ربات تلگرام، شناسهٔ چت و فاصلهٔ زمانی (مثلاً هر ۲۴ ساعت) را وارد کنید. نسخهٔ کامل دیتابیس به صورت فایل `.db.gz` فرستاده می‌شود. دکمه‌های «ارسال بکاپ الان» و «دانلود بکاپ» هم در همان بخش هستند.
+- **از خط فرمان:** `gozar backup` (ذخیرهٔ فایل) یا `gozar backup --send` (ارسال به تلگرام).
+- **بازگردانی روی سرور جدید:**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Danaserver/gozar-relay/main/install.sh) --restore gozar-backup.db.gz
+```
+
+یا روی نصب موجود: `gozar restore gozar-backup.db.gz && gozar restart`.
+
+- **پشت nginx یا aaPanel:** با `--listen 127.0.0.1 --port 8080 --ssl-port 0` نصب کنید و در nginx یک reverse proxy به `http://127.0.0.1:8080` بسازید.
+
 ## ساختار پروژه
 
 ```

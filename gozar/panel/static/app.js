@@ -346,15 +346,34 @@
       field('تعداد لاگ نگهداری‌شده', '<input class="input ltr" type="number" min="100" name="log_retention" value="' + esc(st.log_retention) + '">') +
       '<div class="field"><label>&nbsp;</label><label class="switch"><input type="checkbox" name="trust_proxy"' + (st.trust_proxy ? ' checked' : '') + '><span class="track"></span>پشت Cloudflare / پروکسی هستم</label><span class="hint">IP واقعی کاربر از هدرهای پروکسی خوانده شود</span></div>' +
       '<div class="full"><button class="btn btn-primary">ذخیره</button></div></form></div></div>' +
+      backupCard() +
       '<div class="card"><div class="card-head"><h2>درباره</h2></div><p class="muted">Gozar Relay نسخهٔ ' + esc(S.state.version) + ' · نصب‌شده در ' + dateStr(st.installed_at) + '</p></div>';
     $('#f-account').onsubmit = function (e) {
       e.preventDefault();
       api('account', formData(e.target)).then(function () { toast('حساب بروزرسانی شد'); return load(); }).catch(function (er) { toast(er.message, true); });
     };
+    $('#f-backup').onsubmit = function (e) {
+      e.preventDefault();
+      api('backup/save', formData(e.target)).then(function () { toast('تنظیمات بکاپ ذخیره شد'); return load(); }).catch(function (er) { toast(er.message, true); });
+    };
     $('#f-settings').onsubmit = function (e) {
       e.preventDefault();
       api('settings/save', formData(e.target)).then(function () { toast('ذخیره شد'); return load(); }).catch(function (er) { toast(er.message, true); });
     };
+  }
+
+  function backupCard() {
+    var b = S.state.backup || {};
+    return '<div class="card"><div class="card-head"><div><h2>پشتیبان‌گیری خودکار (تلگرام)</h2><p>نسخهٔ کامل دیتابیس (سرویس‌ها، کلیدها، متغیرها و تنظیمات) به یک ربات تلگرام فرستاده می‌شود.</p></div>' +
+      '<div class="row"><button class="btn btn-sm" data-act="backup-run">' + icon('bolt') + 'ارسال بکاپ الان</button>' +
+      '<a class="btn btn-sm" href="' + esc(G.base) + '/_panel/api/backup/download">' + icon('copy') + 'دانلود بکاپ</a></div></div>' +
+      '<form id="f-backup" class="form-grid">' +
+      field('توکن ربات', '<input class="input ltr" name="bot_token" value="' + esc(b.bot_token) + '" placeholder="123456:ABC...">', 'رباتی که از @BotFather ساخته‌اید') +
+      field('شناسهٔ چت', '<input class="input ltr" name="chat_id" value="' + esc(b.chat_id) + '" placeholder="123456789 یا -100...">', 'آیدی عددی خودتان یا کانال/گروه (ربات باید ادمین باشد). اول به ربات /start بدهید.') +
+      field('هر چند ساعت یک بار', '<input class="input ltr" type="number" min="0" max="720" name="interval_hours" value="' + esc(b.interval_hours || 0) + '">', '۰ = خاموش · مثلاً ۲۴ برای روزی یک بار') +
+      '<div class="field"><label>آخرین بکاپ</label><div class="small muted">' + (b.last_at ? dateStr(b.last_at) + '<br>' + esc(b.last_status) : 'هنوز انجام نشده') + '</div></div>' +
+      '<div class="full"><button class="btn btn-primary">ذخیره</button></div></form>' +
+      '<div class="alert alert-warn" style="margin:14px 0 0">فایل بکاپ شامل کلیدهای دسترسی و کلیدهای API ذخیره‌شده است؛ آن را فقط به چت یا کانال خصوصی خودتان بفرستید.</div></div>';
   }
 
   function field(label, input, hint, full) {
@@ -536,6 +555,10 @@
       });
     },
     'reload-logs': loadLogs,
+    'backup-run': function (el) {
+      el.disabled = true;
+      api('backup/run', {}).then(function (r) { toast(r.message); load(); }).catch(function (e) { toast(e.message, true); }).finally(function () { el.disabled = false; });
+    },
     'clear-unknown': function () {
       confirmBox('گزارش درخواست‌های ناشناس (بدون کلید و بدون سرویس — معمولاً ربات‌های اسکنر) حذف شوند؟', function () {
         api('logs/clear_unknown', {}).then(function (r) { toast(fa(r.deleted) + ' گزارش ناشناس حذف شد'); loadLogs(); load(); });

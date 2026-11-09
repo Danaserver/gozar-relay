@@ -6,7 +6,7 @@ import os
 import re
 import time
 
-from .. import __version__, paths, presets, proxy, security, variables
+from .. import __version__, backup, paths, presets, proxy, security, variables
 from ..http import Response, html_response, json_response, redirect
 
 SESSION_COOKIE = "gozar_session"
@@ -177,6 +177,13 @@ def api(req, store, action):
             "base_url": public_url(req, store),
             "settings": {k: settings.get(k) for k in ("enabled", "admin_username", "log_retention",
                                                        "trust_proxy", "public_url", "installed_at")},
+            "backup": {
+                "bot_token": security.mask_secret(settings.get("backup_bot_token") or ""),
+                "chat_id": settings.get("backup_chat_id") or "",
+                "interval_hours": int(settings.get("backup_interval_hours") or 0),
+                "last_at": settings.get("backup_last_at") or 0,
+                "last_status": settings.get("backup_last_status") or "",
+            },
             "services": [_service_view(s) for s in store.list_services()],
             "keys": [_key_view(k) for k in store.list_keys()],
             "presets": presets.PRESETS,
@@ -227,6 +234,30 @@ def api(req, store, action):
     if action == "logs/clear":
         store.clear_logs()
         return json_response({"ok": True})
+
+    if action == "backup/save":
+        token = (data.get("bot_token") or "").strip()
+        if token and token != security.mask_secret(store.get("backup_bot_token") or ""):
+            if not re.match(r"^\d+:[A-Za-z0-9_\-]{20,}$", token):
+                raise ValueError("توکن ربات تلگرام نامعتبر است")
+            store.set("backup_bot_token", token)
+        elif not token:
+            store.set("backup_bot_token", "")
+        chat = (data.get("chat_id") or "").strip()
+        if chat and not re.match(r"^(-?\d{3,20}|@[A-Za-z0-9_]{4,64})$", chat):
+            raise ValueError("شناسهٔ چت نامعتبر است (عدد، مثلاً 123456789 یا -100...، یا @channel)")
+        store.set("backup_chat_id", chat)
+        store.set("backup_interval_hours", _int(data.get("interval_hours"), 0, 0, 720))
+        return json_response({"ok": True})
+
+    if action == "backup/run":
+        ok, msg = backup.run(store)
+        return json_response({"ok": ok, "message": msg}, 200 if ok else 400)
+
+    if action == "backup/download":
+        name, blob = backup.snapshot(store)
+        return Response(200, [("Content-Type", "application/gzip"), ("Cache-Control", "no-store"),
+                              ("Content-Disposition", 'attachment; filename="{}"'.format(name))], blob)
 
     if action == "settings/save":
         store.set("trust_proxy", _bool(data.get("trust_proxy")))

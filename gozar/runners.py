@@ -76,6 +76,12 @@ def run_cgi():
         pass
     finally:
         resp.close()
+    try:  # CGI has no background threads: run a due automatic backup after replying
+        from . import backup
+        from .store import get_store
+        backup.maybe_run(get_store())
+    except Exception:
+        pass
 
 
 # ----------------------------------------------------------------- standalone
@@ -218,6 +224,8 @@ def run_standalone(host="0.0.0.0", port=8080, ssl_port=0, cert=None, key=None, b
         print("! No listener could be started.")
         sys.exit(1)
 
+    from . import backup
+    backup.start_scheduler()
     print("Gozar relay v{} — database: {}".format(__version__, paths.db_path()))
     for scheme, p, _ in servers:
         print("  listening on {}://{}:{}{}".format(scheme, host, p, base_path or "/"))

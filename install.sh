@@ -10,6 +10,8 @@
 #    --ssl-port 443               SSL_PORT=...   HTTPS port  (0 = disabled)
 #    --email you@example.com      EMAIL=...      Let's Encrypt account e-mail
 #    --self-signed                               skip Let's Encrypt, use a self-signed cert
+#    --listen 127.0.0.1           LISTEN=...     bind address (127.0.0.1 behind nginx/aaPanel)
+#    --restore backup.db.gz       RESTORE=...    restore a Gozar backup before starting
 #    --yes                                       non-interactive, accept defaults
 #    uninstall                                   remove Gozar (keeps the database)
 #
@@ -25,6 +27,7 @@ SERVICE="gozar"
 BIN="/usr/local/bin/gozar"
 
 DOMAIN="${DOMAIN:-}"; PORT="${PORT:-}"; SSL_PORT="${SSL_PORT:-}"; EMAIL="${EMAIL:-}"
+LISTEN="${LISTEN:-0.0.0.0}"; RESTORE="${RESTORE:-}"
 SELF_SIGNED=0; ASSUME_YES=0; ACTION="install"
 
 while [ $# -gt 0 ]; do
@@ -34,6 +37,8 @@ while [ $# -gt 0 ]; do
     --ssl-port) SSL_PORT="$2"; shift ;;
     --email) EMAIL="$2"; shift ;;
     --self-signed) SELF_SIGNED=1 ;;
+    --listen) LISTEN="$2"; shift ;;
+    --restore) RESTORE="$2"; shift ;;
     -y|--yes) ASSUME_YES=1 ;;
     uninstall) ACTION="uninstall" ;;
     -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
@@ -202,7 +207,7 @@ fi
 
 # ------------------------------------------------------------------- service
 step "Configuring systemd service"
-EXEC="$PY $APP_DIR/relay.py serve --host 0.0.0.0 --port $PORT --ssl-port $SSL_PORT"
+EXEC="$PY $APP_DIR/relay.py serve --host $LISTEN --port $PORT --ssl-port $SSL_PORT"
 [ -n "$CERT" ] && EXEC="$EXEC --cert $CERT --key $KEY"
 cat > "/etc/systemd/system/${SERVICE}.service" <<EOF
 [Unit]
@@ -253,6 +258,11 @@ HOST="${DOMAIN:-$SERVER_IP}"
 URL="${SCHEME}://${HOST}"
 { [ "$SCHEME" = https ] && [ "$HPORT" -eq 443 ]; } || { [ "$SCHEME" = http ] && [ "$HPORT" -eq 80 ]; } || URL="${URL}:${HPORT}"
 
+if [ -n "$RESTORE" ]; then
+  [ -f "$RESTORE" ] || die "Backup file not found: $RESTORE"
+  "$PY" "$APP_DIR/relay.py" restore "$RESTORE" || die "Restore failed"
+  ok "restored data from $RESTORE"
+fi
 INIT_JSON="$("$PY" "$APP_DIR/relay.py" init --json --public-url "$URL" 2>/dev/null || true)"
 ADMIN_USER="$(echo "$INIT_JSON" | "$PY" -c 'import json,sys; print(json.load(sys.stdin).get("username") or "admin")' 2>/dev/null || echo admin)"
 ADMIN_PASS="$(echo "$INIT_JSON" | "$PY" -c 'import json,sys; print(json.load(sys.stdin).get("password") or "")' 2>/dev/null || true)"

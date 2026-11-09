@@ -443,6 +443,56 @@ class TlsListenerTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class BackupTests(unittest.TestCase):
+    def test_snapshot_restore_and_send(self):
+        import gzip
+        from gozar import backup
+        from gozar.store import Store
+        tmp = tempfile.mkdtemp(prefix="gozar-bak-")
+        try:
+            st = Store(os.path.join(tmp, "a.db"))
+            st.initialize(password="pw-123456")
+            st.add_key({"name": "hamicar", "key": "gz_backupkey_123456", "services": "*"})
+            name, data = backup.snapshot(st)
+            self.assertTrue(name.endswith(".db.gz"))
+            path = os.path.join(tmp, name)
+            with open(path, "wb") as f:
+                f.write(data)
+            self.assertTrue(gzip.decompress(data).startswith(b"SQLite format 3"))
+
+            target = os.path.join(tmp, "b.db")
+            keys, services = backup.restore(path, target)
+            self.assertEqual(keys, 2)
+            self.assertGreaterEqual(services, 3)
+            self.assertIsNotNone(Store(target).get_key(key="gz_backupkey_123456"))
+
+            bad = os.path.join(tmp, "bad.db")
+            with open(bad, "wb") as f:
+                f.write(b"not a database")
+            with self.assertRaises(Exception):
+                backup.restore(bad, target)
+
+            sent = {}
+            orig = backup.send_telegram
+            backup.send_telegram = lambda token, chat, fname, blob, caption="": sent.update(
+                token=token, chat=chat, size=len(blob))
+            try:
+                self.assertFalse(backup.run(st)[0])  # not configured yet
+                st.set("backup_bot_token", "123:abc")
+                st.set("backup_chat_id", "42")
+                st.set("backup_interval_hours", 1)
+                self.assertTrue(backup.due(st))
+                ok, _ = backup.run(st, "auto")
+                self.assertTrue(ok)
+                self.assertEqual(sent["chat"], "42")
+                self.assertFalse(backup.due(st))
+            finally:
+                backup.send_telegram = orig
+            st.close()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class VariablesTests(unittest.TestCase):
     def test_parse_and_mask(self):
         from gozar import variables as V
