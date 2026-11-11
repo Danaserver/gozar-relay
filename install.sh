@@ -26,6 +26,8 @@ APP_DIR="${GOZAR_APP_DIR:-/opt/gozar}"
 DATA_DIR="/var/lib/gozar"
 SERVICE="gozar"
 BIN="/usr/local/bin/gozar"
+SUP_INI="/www/server/panel/plugin/supervisor/profile/gozar.ini"
+SUPCTL="/www/server/panel/pyenv/bin/supervisorctl"
 
 DOMAIN="${DOMAIN:-}"; PORT="${PORT:-}"; SSL_PORT="${SSL_PORT:-}"; EMAIL="${EMAIL:-}"
 LISTEN="${LISTEN:-0.0.0.0}"; RESTORE="${RESTORE:-}"
@@ -240,11 +242,19 @@ cat > "$BIN" <<EOF
 # Gozar management helper
 export GOZAR_DATA_DIR="${DATA_DIR}"
 case "\${1:-}" in
-  status)    systemctl status ${SERVICE} --no-pager ;;
-  restart)   systemctl restart ${SERVICE} && echo "restarted" ;;
-  stop)      systemctl stop ${SERVICE} ;;
-  start)     systemctl start ${SERVICE} ;;
-  logs)      journalctl -u ${SERVICE} -f -n 100 ;;
+  status|restart|stop|start|logs)
+    if [ -f "${SUP_INI}" ]; then  # managed by the aaPanel Supervisor plugin
+      case "\$1" in
+        logs) tail -n 100 -f /www/server/panel/plugin/supervisor/log/${SERVICE}.out.log /www/server/panel/plugin/supervisor/log/${SERVICE}.err.log ;;
+        *) ${SUPCTL} "\$1" "${SERVICE}:*" ;;
+      esac
+    else
+      case "\$1" in
+        logs) journalctl -u ${SERVICE} -f -n 100 ;;
+        status) systemctl status ${SERVICE} --no-pager ;;
+        *) systemctl "\$1" ${SERVICE} && echo "\$1: ok" ;;
+      esac
+    fi ;;
   update)    bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh) --yes --port ${PORT} --ssl-port ${SSL_PORT} --listen ${LISTEN} --app-dir ${APP_DIR} ${DOMAIN:+--domain $DOMAIN} ;;
   uninstall) bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh) uninstall ;;
   ""|-h|--help)
@@ -281,10 +291,19 @@ done
 command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld && firewall-cmd -q --reload || true
 
 systemctl daemon-reload
-systemctl enable "$SERVICE" >/dev/null 2>&1
-systemctl restart "$SERVICE"
-sleep 1.5
-systemctl is-active --quiet "$SERVICE" || { journalctl -u "$SERVICE" -n 30 --no-pager; die "Service failed to start"; }
+if [ -f "$SUP_INI" ]; then
+  # Registered in the aaPanel Supervisor plugin: let it own the process, keep systemd out of the way
+  systemctl disable --now "$SERVICE" >/dev/null 2>&1 || true
+  $SUPCTL restart "${SERVICE}:*" >/dev/null 2>&1 || $SUPCTL start "${SERVICE}:*" >/dev/null 2>&1 || true
+  sleep 3
+  curl -fs "http://127.0.0.1:$((PORT > 0 ? PORT : SSL_PORT))/_health" >/dev/null || die "Service failed to start (check: gozar logs)"
+  ok "managed by aaPanel Supervisor"
+else
+  systemctl enable "$SERVICE" >/dev/null 2>&1
+  systemctl restart "$SERVICE"
+  sleep 1.5
+  systemctl is-active --quiet "$SERVICE" || { journalctl -u "$SERVICE" -n 30 --no-pager; die "Service failed to start"; }
+fi
 ok "service '${SERVICE}' is running"
 
 # ------------------------------------------------------------------- summary
