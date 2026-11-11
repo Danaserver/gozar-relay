@@ -122,6 +122,7 @@ else
   ok "downloaded ${REPO}@${BRANCH}"
 fi
 systemctl stop "$SERVICE" 2>/dev/null || true
+[ -f "$SUP_INI" ] && { $SUPCTL stop "${SERVICE}:*" >/dev/null 2>&1 || true; }
 mkdir -p "$APP_DIR" "$DATA_DIR"
 chmod 700 "$DATA_DIR"
 rm -rf "$APP_DIR/gozar"
